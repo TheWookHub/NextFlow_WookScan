@@ -28,6 +28,23 @@ TO BE FILLED!
  - Legana
 
 
+### Example command
+
+```
+nextflow run /home/preston/PhIPSeq-Pipelines/nf-core-wookflow/main.nf \
+--run_phippery True \
+-profile docker \
+--peptide_table InputFiles/peptide_table_VIR3_full_v2.csv \
+--sample_table InputFiles/sample_table_UNSW_VirScan.csv \
+--run_cpm_enr_workflow true \
+--oligo_tile_length 50 \
+--read_length 51 \
+--results ../TestWookFlow/WookScanNextFlowTest \
+--outdir ../TestWookFlow/ \
+--dataset_prefix "data"
+```
+
+
 ## Introduction
 
 **nf-core/wookflow** is a bioinformatics pipeline that ...

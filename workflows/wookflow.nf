@@ -16,6 +16,21 @@ include { PHIPPERY                } from '../subworkflows/local/phippery/main.nf
     RUN MAIN WORKFLOW
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 */
+log.info"""
+
+#################################
+#      Welcome to WookScan      #
+#################################
+
+A custom built VirScan analysis suite.
+
+Contributors:
+    - Preston (preston@unsw.edu.au)
+    - Bea (b.delgado_corrales@unsw.edu.au)
+    - Legana (l.fingerhut@unsw.edu.au)
+
+"""
+
 
 workflow WOOKFLOW {
 
@@ -77,9 +92,15 @@ workflow WOOKFLOW {
     //    
     if(params.run_phippery == true){        
         log.info """\
-            P H I P - F L O W!
+            --------------------------------------
+            WookScan now using: P H I P - F L O W!
+            --------------------------------------
+            
+            Phippery & phip-flow is developed by:
             Matsen, Overbaugh, and Minot Labs
             Fred Hutchinson CRC, Seattle WA
+            Repository: https://github.com/matsengrp/phip-flow
+            
             ================================
             sample_table    : $params.sample_table
             peptide_table   : $params.peptide_table
