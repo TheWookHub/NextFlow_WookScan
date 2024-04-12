@@ -11,6 +11,7 @@
 // include { softwareVersionsToYAML } from '../subworkflows/nf-core/utils_nfcore_pipeline'
 // include { methodsDescriptionText } from '../subworkflows/local/utils_nfcore_wookflow_pipeline'
 include { PHIPPERY                } from '../subworkflows/local/phippery/main.nf'
+include { PHIPPERYTOAVARDA        } from '../subworkflows/local/phipperyToAvarda/main.nf'
 /*
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     RUN MAIN WORKFLOW
@@ -108,7 +109,20 @@ workflow WOOKFLOW {
             reads_prefix    : $params.reads_prefix
 
         """.stripIndent()
-        PHIPPERY()        
+        PHIPPERY()
+        
+        og.info """\
+            --------------------------------------
+            WookScan now using: PHIP to AVARDA!
+            --------------------------------------
+            Phippery output to AVARDA is developed by:
+            Preston Leung            
+        
+            ================================
+            user_pep_id     : $params.user_pep_id
+            
+
+        """.stripIndent()
     }
 }
 

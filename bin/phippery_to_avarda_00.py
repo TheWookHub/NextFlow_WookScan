@@ -67,3 +67,12 @@ phip_edgeRhits_ready.to_csv(
     header = True,
     index = False
 )
+# 
+virlib_table = wookscan_table.loc[:,['u_pep_id','original_id']].rename(columns = {'original_id':'pep_id'})
+virlib_table[
+    ~virlib_table.u_pep_id.duplicated()
+].to_csv(
+    args.u_pep_id + "_virlib_names.csv",
+    index = False,
+    header = True
+)
