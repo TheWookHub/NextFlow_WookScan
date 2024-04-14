@@ -65,5 +65,9 @@ include { DSOUT } from './workflows/output.nf'
 include { AGG } from './workflows/aggregate.nf'
 
 workflow PHIPPERY {
+    main:
     ALIGN | STATS | DSOUT | AGG
+
+    emit:
+    AGG.out
 }

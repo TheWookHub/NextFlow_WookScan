@@ -68,6 +68,9 @@ workflow AGG {
             .flatten()
             .toSortedList()
     )
+    // added by me
+    emit:
+        dump_binary        
 }
 
 

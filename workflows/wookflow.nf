@@ -94,35 +94,31 @@ workflow WOOKFLOW {
     if(params.run_phippery == true){        
         log.info """\
             --------------------------------------
-            WookScan now using: P H I P - F L O W!
+            WookScan uses: P H I P - F L O W!
             --------------------------------------
             
             Phippery & phip-flow is developed by:
             Matsen, Overbaugh, and Minot Labs
             Fred Hutchinson CRC, Seattle WA
-            Repository: https://github.com/matsengrp/phip-flow
-            
+            Repository: https://github.com/matsengrp/phip-flow            
             ================================
             sample_table    : $params.sample_table
             peptide_table   : $params.peptide_table
             results         : $params.results
             reads_prefix    : $params.reads_prefix
 
-        """.stripIndent()
-        PHIPPERY()
-        
-        og.info """\
+            
             --------------------------------------
-            WookScan now using: PHIP to AVARDA!
+            WookScan Custom Scripts
             --------------------------------------
             Phippery output to AVARDA is developed by:
-            Preston Leung            
-        
+            Preston Leung
             ================================
             user_pep_id     : $params.user_pep_id
-            
 
         """.stripIndent()
+        PHIPPERY()        
+        PHIPPERYTOAVARDA(PHIPPERY.out)
     }
 }
 

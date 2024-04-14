@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 import phippery as ph
 import pandas as pd
 import argparse

@@ -10,7 +10,7 @@ nextflow.enable.dsl=2
 *       1)  virlib table 
 *       2)  phippery edgeR avarda input read files
 */
-include { PHIPOUTPUT } from '../../../modules/local/phipout/phipout.nf'
+include { PHIPOUTPUT } from '../../../modules/local/phipout/main.nf'
 
 /* 
 *   If needed we generate the new viral database for avarda creating a series
@@ -28,8 +28,14 @@ include { PHIPOUTPUT } from '../../../modules/local/phipout/phipout.nf'
 *
 *   Note to self: Need to figure out later how to co-ordinate the options to run this nexflow pipeline.
 */
-// include { VIRALDB } from ''
+// include { VIRALDB } from '../../../modules/local/phipout/main.nf'
 
-workflow{
-    PHIPOUTPUT()
+upep_prefix_ch = Channel.value(params.user_pep_id)
+
+workflow PHIPPERYTOAVARDA{
+    take:
+    data_phip_ch
+
+    main:
+    PHIPOUTPUT(upep_prefix_ch,data_phip_ch)
 }
