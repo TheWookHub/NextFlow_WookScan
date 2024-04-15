@@ -28,47 +28,79 @@ phip_edgeRhits.fillna(False, inplace = True)
 phip_anno_table = ph.get_annotation_table(phip_result, dim = 'peptide')
 
 # we extract the relevent columns for our id matching:
-wookscan_table = phip_anno_table[['original_id','oligo']].reset_index()
+if('original_id' in phip_anno_table):
+    wookscan_table = phip_anno_table[['original_id','oligo']].reset_index()
+    # and we get something like this (note peptide_metadata is the index, not treated as a column):
+    #
+    #       peptide_metadata  peptide_id  original_id                                              oligo
+    #       0                          0            1  ATGCGCAGCTTGCTGTTTGTGGTCGGTGCTTGGGTCGCTGCTCTCG...
+    #       1                          1            2  ACTACAACCACCGCTGCCGCAGGGAACACATCTGCAACAGCTTCTC...
+    #       2                          2            3  ATTACCGCTGCCGCTCCTCCAGGTCATTCAACACCTTGGCCTGCAC...    
+    #       ...                      ...          ...                                                ...    
+    #       128255                128255       128286  ATCCCTGCCAGCAACGAAACGGATAATAGCCCACTGGGGGGGTATA...
+    #       128256                128256       128287  ATTATGACAAGTTCAAAATTTGGCGGGGTCAATGTTTGGAATCGCT...
+    
+    # we create the new u_pep_id columsn in wookscan_table
+    # 'WOOKSCAN_001_' is up to your analysis tag. You can 
+    # name it 'UNICORN_069_' if it suits your need.
+    wookscan_table['u_pep_id'] = [args.u_pep_id +"_" + x for x in wookscan_table.oligo.values]
 
-# and we get soething like this (note peptide_metadata is the index, not treated as a column):
-#        peptide_metadata  peptide_id  original_id                                              oligo
-#        0                          0            1  ATGCGCAGCTTGCTGTTTGTGGTCGGTGCTTGGGTCGCTGCTCTCG...
-#        1                          1            2  ACTACAACCACCGCTGCCGCAGGGAACACATCTGCAACAGCTTCTC...
-#        2                          2            3  ATTACCGCTGCCGCTCCTCCAGGTCATTCAACACCTTGGCCTGCAC...
-#        3                          3            4  TTGTGCGCCCTCACACTCGCAGCAATGGGCGCCGGGGCATTGCTTC...
-#        4                          4            5  CGCGATCGCGGCCCTTCTCGCTCTCGCGTGCGCTACACCCGCCTGG...
-#        ...                      ...          ...                                                ...
-#        128252                128252       128283  AAAGACTTGACAAAGGATCGCACGCGCCCGTTCTACTTATCTGCTG...
-#        128253                128253       128284  TTATGGACTGCGGTCGAGACTGGCCTTTTTGATTTCGTCTGGGTAA...
-#        128254                128254       128285  ACAGCGGCTGGGCTGGATGCCTTCTACCGCAGCTGGTATGACTGGA...
-#        128255                128255       128286  ATCCCTGCCAGCAACGAAACGGATAATAGCCCACTGGGGGGGTATA...
-#        128256                128256       128287  ATTATGACAAGTTCAAAATTTGGCGGGGTCAATGTTTGGAATCGCT...
+    # our AVARDA ready table will be made like via merging:
+    phip_edgeRhits_ready = wookscan_table.loc[
+        :,
+        ['peptide_id','original_id','u_pep_id']
+    ].merge(
+        phip_edgeRhits, 
+        on = 'peptide_id'
+    ).drop(
+        ['peptide_id','original_id'],
+        axis = 1
+    ).drop_duplicates()
 
-# we create the new u_pep_id columsn in wookscan_table
-# 'WOOKSCAN_001_' is up to your analysis tag. You can 
-# name it 'UNICORN_069_' if it suits your need.
-wookscan_table['u_pep_id'] = [args.u_pep_id +"_" + x for x in wookscan_table.oligo.values]
+    # Create virlib Table from the phippery output for AVARDA
+    virlib_table = wookscan_table.loc[:,['u_pep_id','original_id']].rename(columns = {'original_id':'pep_id'})
 
-# our AVARDA ready table will be made like via merging:
-phip_edgeRhits_ready = wookscan_table.loc[
-    :,
-    ['peptide_id','original_id','u_pep_id']
-].merge(
-    phip_edgeRhits, 
-    on = 'peptide_id'
-).drop(
-    ['peptide_id','original_id'],
-    axis = 1
-).drop_duplicates()
+else:
+    wookscan_table = phip_anno_table[['oligo']].reset_index()
 
-# We now write this to file
+    # or if there's no 'original_id' in the columns then:
+    #
+    #       peptide_metadata  peptide_id                                              oligo
+    #       0                          0  aggaattctacgctgagtATGTTCCTGATCCTGCTGATCTCTCTGC...
+    #       1                          1  aggaattctacgctgagtTGCACCCTGGACCCGCGTCTGAAAGGTT...
+    #       2                          2  aggaattctacgctgagtATCTCTACCGACACCGTTGACGTTACCA...    
+    #       ...                      ...                                                ...    
+    #       10045                  10045  aggaattctacgctgagtACCAACGACCCGATCCGTTTCTGCCTGG...
+    #       10046                  10046  aggaattctacgctgagtACCGTTTGCAAAGTTTGCGGTTGCTGGC...
+
+    # we create the new u_pep_id columsn in wookscan_table
+    # 'WOOKSCAN_001_' is up to your analysis tag. You can 
+    # name it 'UNICORN_069_' if it suits your need.
+    wookscan_table['u_pep_id'] = [args.u_pep_id +"_" + x for x in wookscan_table.oligo.values]
+
+    # our AVARDA ready table will be made like via merging:
+    phip_edgeRhits_ready = wookscan_table.loc[
+        :,
+        ['peptide_id','u_pep_id']
+    ].merge(
+        phip_edgeRhits, 
+        on = 'peptide_id'
+    ).drop(
+        ['peptide_id'],
+        axis = 1
+    ).drop_duplicates()
+
+    # Create virlib Table from the phippery output for AVARDA
+    virlib_table = wookscan_table.loc[:,['u_pep_id','peptide_id']].rename(columns = {'peptide_id':'pep_id'})
+
+
+# We now write both files to file
 phip_edgeRhits_ready.to_csv(
     "PhipperyEdgeRHITS_AVARDA_Input.csv",
     header = True,
     index = False
 )
-# 
-virlib_table = wookscan_table.loc[:,['u_pep_id','original_id']].rename(columns = {'original_id':'pep_id'})
+
 virlib_table[
     ~virlib_table.u_pep_id.duplicated()
 ].to_csv(
