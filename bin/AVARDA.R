@@ -15,6 +15,27 @@ suppressWarnings(
   )
 )
 
+######################################################
+# Defining arguments to be passed into AVARDA script #
+######################################################
+
+option_list = list(
+  make_option(c("-p", "--param_file"), action="store", default=NULL, type='character',
+              help="parameter file to configure SKAT-O run. Must be in comma separated format."),
+  make_option(c("-o", "--out"), action="store", default= default_filePath,
+              help="Output tab-separated result. Default name will be current directory with file name: %default.")
+)
+
+opt = parse_args(
+  OptionParser(
+    option_list = option_list,
+    description = help_msg
+  )
+)
+
+
+
+
 ######################
 # Define function(s) #
 ######################
@@ -338,34 +359,18 @@ AVARDA = function(case_path,thresh,dict_path,total_path,pairwise_path,blast_path
   fwrite(rbindlist(list(zeta %>% select(name, Virus,`P-value`) %>% spread(name,`P-value`,fill = 1),empty_virus)),file = paste0(out_path,out_name,"AVARDA_post_p_value",".csv"))
 }
 
-######################################################
-# Defining arguments to be passed into AVARDA script #
-######################################################
-
-option_list = list(
-  make_option(c("-p", "--param_file"), action="store", default=NULL, type='character',
-              help="parameter file to configure SKAT-O run. Must be in comma separated format."),
-  make_option(c("-o", "--out"), action="store", default= default_filePath,
-              help="Output tab-separated result. Default name will be current directory with file name: %default.")
-)
-
-opt = parse_args(
-  OptionParser(
-    option_list = option_list,
-    description = help_msg
-  )
-)
-
+#################################
+# Prepare data from user params #
+#################################
 
 input = list()
-
 
 # Input1: path to file of data to be analyzed, rows are peptides,           #
 # columns are samples, values are generally binary values (indicating hits)
 input[[1]] = "/home/preston/PhIPSeq-Pipelines/AVARDA_Runs/TestAVARDA/UNSW_VirScan_PhipperyEdgeRHITS_FullVir3_SmallVer_Input.csv"
 
 
-# Input2: thesholdiag value for input 1; set to 1 if using binary matrix #
+# Input2: theshold value for input 1; set to 1 if using binary matrix #
 input[[2]] = 1
 
 # Input3: path to "dictionary" indicating all inter-peptide alignments #

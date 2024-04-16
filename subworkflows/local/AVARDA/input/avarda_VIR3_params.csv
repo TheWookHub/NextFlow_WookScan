@@ -1,0 +1,10 @@
+Params,value
+case_path,input[[1]]
+thresh,input[[2]]
+dict_path,input[[3]]
+total_path,input[[4]]
+pairwise_path,input[[5]]
+blast_path,input[[6]]
+out_path,input[[7]]
+out_name,input[[8]]
+avarda_names,input[[9]]
