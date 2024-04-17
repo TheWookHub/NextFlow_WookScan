@@ -15,15 +15,41 @@ suppressWarnings(
   )
 )
 
+
+############################
+# Global Variables for use #
+############################
+
+optList = c(
+  "case_path","thresh","dict_path","total_path",
+  "pairwise_path","blast_path","out_path","out_name",
+  "avarda_names"
+)
+
 ######################################################
 # Defining arguments to be passed into AVARDA script #
 ######################################################
 
 option_list = list(
-  make_option(c("-p", "--param_file"), action="store", default=NULL, type='character',
-              help="parameter file to configure SKAT-O run. Must be in comma separated format."),
-  make_option(c("-o", "--out"), action="store", default= default_filePath,
-              help="Output tab-separated result. Default name will be current directory with file name: %default.")
+  # Will probably use this option later. But First make the params work
+  # make_option(c("-p", "--param_file"), action="store", default=NULL, type='character',
+  #             help="parameter file to configure SKAT-O run. Must be in comma separated format."),  
+  make_option(c("--case_path"),action="store"),
+  make_option(c("--thresh"),action="store"),
+  make_option(c("--dict_path"),action="store"),
+  make_option(c("--total_path"),action="store"),
+  make_option(c("--pairwise_path"),action="store"),
+  make_option(c("--blast_path"),action="store"),
+  make_option(c("--out_path"),action="store"),
+  make_option(c("--out_name"),action="store"),
+  make_option(c("--avarda_names"),action="store")  
+  # make_option(c("-o", "--out"), action="store", default= default_filePath,
+  #             help="Output tab-separated result. Default name will be current directory with file name: %default.")
+)
+
+help_msg = paste(
+  "AVARDA Tool - implemented by Monaco et al.",
+  "and modified by Preston L for nextflow usage."
 )
 
 opt = parse_args(
@@ -39,6 +65,18 @@ opt = parse_args(
 ######################
 # Define function(s) #
 ######################
+
+helpMsg = function(input_param){
+  print_help(OptionParser(
+    option_list=option_list,
+    description = help_msg
+  ))
+  message("-------------------------------------------")
+
+  missing = setdiff(optList, names(input_param))
+  message(paste("The following required parameters not found:",paste(missing, collapse = ', ')))
+  message("Exit.")
+}
 
 AVARDA = function(case_path,thresh,dict_path,total_path,pairwise_path,blast_path,out_path,out_name,avarda_names){
   # dict =  data.frame(fread("unzip -cq ./bin/df.csv.zip",data.table = FALSE)) # read in peptide-peptide dictionary
@@ -401,18 +439,22 @@ input[[9]] = "/home/preston/PhIPSeq-Pipelines/AVARDA_Runs/TestAVARDA/WOOKIES_vir
 
 
 
-
-
-
-
-if(dir.exists(input[[7]])){
-  print(paste(input[[7]], "exists! Using existing directory.."))
-}else{
-  print(paste(input[[7]],"not found! Creating new directory.."))
-  dir.create(input[[7]])
+message("Checking out correct usage of optparse")
+print(length(opt))
+if(length(opt) < 10){  
+  helpMsg(opt)
 }
 
-AVARDA(input[[1]],as.numeric(input[[2]]),input[[3]],input[[4]],input[[5]],input[[6]],input[[7]],input[[8]],input[[9]])
+
+
+# if(dir.exists(input[[7]])){
+#   print(paste(input[[7]], "exists! Using existing directory.."))
+# }else{
+#   print(paste(input[[7]],"not found! Creating new directory.."))
+#   dir.create(input[[7]])
+# }
+
+# AVARDA(input[[1]],as.numeric(input[[2]]),input[[3]],input[[4]],input[[5]],input[[6]],input[[7]],input[[8]],input[[9]])
 
 # case_path = input[[1]]
 # thresh = input[[2]]

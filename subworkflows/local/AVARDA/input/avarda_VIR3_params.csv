@@ -1,7 +1,7 @@
 Params,value
-case_path,input[[1]]
-thresh,input[[2]]
-dict_path,input[[3]]
+case_path,subworkflows/local/AVARDA/data/some_default_input.csv
+thresh,1
+dict_path,
 total_path,input[[4]]
 pairwise_path,input[[5]]
 blast_path,input[[6]]
