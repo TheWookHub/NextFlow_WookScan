@@ -144,13 +144,14 @@ AVARDA = function(case_path,thresh,dict_path,total_path,pairwise_path,blast_path
     # a set of pep_ids (vertex) and tells the minimal number of unique epitopes.
     # Reminder dict came from a blastp pep2pep alignment including only eval
     # <100. Indicating that these peptides are overlapping / similar to each other
+    # MODIFICATION: 
+    #   -> Make it return peptide ids too.    
     filter  = function(edge,vertex){
         # this is a vertex list of peptide ids for a specific virus in one
         # patient
         nodes = unlist(vertex)
         # grab edge-pairs where the 'from' match with the vertex list 
         links_filtered = subset(edge,unlist(edge[,1]) %in% nodes)
-        print(dim(links_filtered))
         # grab edge-pairs where the 'to' match with the vertex list from links_filtered
         # the aim is to find the peptides ids from nodes that link to each other
         # ie - they're overlapping or similar.
@@ -176,15 +177,36 @@ AVARDA = function(case_path,thresh,dict_path,total_path,pairwise_path,blast_path
             # get island networks that have node count < 30
             x_1 = x[sapply(x,vcount)<30]
             
-            # get the independence set size
+            # get the largest (maximum) independence set size
             # x_1_sum  = sum(unlist(lapply(x_1,independence.number))) # deprecated
-            x_1_sum  = sum(unlist(lapply(x_1,ivs_size)))
+            x_1_sum  = sum(unlist(lapply(x_1,ivs_size)))            
             
+            # here we retrieve the ids of the largest independent vertex set names
+            # (i.e. the peptide ids). We take the ids of the very first set (if
+            # there are multiple largest sets) because it doesn't really matter
+            # which set we take. We could take a random set everytime. Since at the 
+            # largest sets, you're basically swapping out one for another, meaning the
+            # one being swapped out cannot be included together with the one swapped in
+            # due to them being linked to each other (and therefore are overlapping / 
+            # similar peptides).
+            x_1_ids = unlist(
+                lapply(
+                    x_1,
+                    function(i){
+                        all_largest_sets = largest_ivs(i)
+                        return(all_largest_sets[[1]]$name)
+                    }
+                )                
+            )
+            if(x_1_sum != length(x_1_ids)){
+                message("Something weird has happened to getting independent vertex set ids and size.")
+            }
             # get island networks that have a node count >= 30
             # usually means loads of peptides are overlapping each other
             # need some simplifications
             x_2 = x[sapply(x,vcount)>=30]
             temp = c()
+            x_2_ids = c()
             #x_2 = x
             if(length(x_2) >0){
                 # for each island network in the  >= 30 nodes set
@@ -198,17 +220,36 @@ AVARDA = function(case_path,thresh,dict_path,total_path,pairwise_path,blast_path
                         toss = degree(x_2_r)==max(degree(x_2_r))
                         x_2_r = delete_vertices(x_2_r, V(x_2_r)[toss][1])
                     }
-                    # once again break it down to see islands of disconnected network
-                    x_l = decompose.graph(x_2_r)
+                    # once again, break it down to see islands of disconnected network
+                    x_l = decompose(x_2_r)
                     # for each 
-                    temp[R] = sum(unlist(lapply(x_l,independence.number)))
+                    # temp[R] = sum(unlist(lapply(x_l,independence.number))) # deprecated
                     temp[R] = sum(unlist(lapply(x_l,ivs_size)))
+                    x_2_ids[R] = list(
+                        unlist(
+                            lapply(
+                                x_l,
+                                function(i){
+                                    all_largest_sets = largest_ivs(i)
+                                    return(all_largest_sets[[1]]$name)
+                                }
+                            )
+                        )
+                    )
                 }
             }
-            return(sum(x_1_sum)+sum(temp))
+            total_unique_peptides = sum(x_1_sum)+sum(temp)
+            all_unique_peptide_ids = list(c(x_1_ids,unlist(x_2_ids)))
+            # return(sum(x_1_sum)+sum(temp))
+            return(c(total_unique_peptides, all_unique_peptide_ids))
         }
+        # if we do not find ANY peptides that link to each other..
+        # means peptide (node) is their own network island. 
+        # and each is a maximum independent vertex set. Hence,
+        # returning the length of the nodes and the node id (peptide id)
+        # is good
         if(dim(links_filtered)[1]==0){
-            return(length(nodes))
+            return(c(length(nodes),nodes))
         }
     }
 
@@ -224,18 +265,23 @@ AVARDA = function(case_path,thresh,dict_path,total_path,pairwise_path,blast_path
         # all virus i evidence minus any shared with virus j
         v_total = v_total[!v_total %in% v_i_j]
         # this calculates N_rank
-        v_total_f = filter(dict,v_total)
+        unique_peptides = filter(dict,v_total)
+        v_total_f = unique_peptides[[1]] # count
+        v_total_ids = unique_peptides[[2]] # ids
         #if(length(N_rank)!=length(unlist(N_rank_2))){
         N_rank = N_rank[!N_rank %in% v_xr]
         # this is by default zero for total binom calculation
         N_rank = N_rank[!N_rank %in% (v_i %in% v_i_j)] 
-        N_rank_f = filter(dict,N_rank)
+        unique_n_ranks = filter(dict,N_rank)
+        N_rank_f = unique_n_ranks[[1]]
+        N_rank_ids = unique_n_ranks[[2]]
         #}
         if(N_rank_f == 0){
             return(NULL)
         }
+        # x gives the p-value
         x = binom.test(v_total_f,N_rank_f,unlist(null_prob),"greater")[[3]]
-        output = list(x,v_total_f,N_rank_f)
+        output = list(x,v_total_f,N_rank_f,v_total_ids)
         return(output)
     }
   
@@ -272,6 +318,7 @@ AVARDA = function(case_path,thresh,dict_path,total_path,pairwise_path,blast_path
                 blast_subset=blast_subset[, colSums(ifelse(blast_subset>80, 1, 0)) > 2]
                 # Sometimes it might not be a dataframe....? E.g. vector,then it fails.
                 if(is.data.frame(blast_subset)==TRUE){
+                    # there are at least 1 virus detected
                     if(dim(blast_subset)[2]>0){
                         fullmatrix_sorted = blast_subset
                         v_i_j = NULL
