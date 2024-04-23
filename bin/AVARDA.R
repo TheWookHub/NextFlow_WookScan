@@ -612,6 +612,11 @@ if(length(opt) < 10){
     }else{
         fixed_outpath = opt$out_path
     }
+    if(length(grep('_$', opt$out_name)) < 1){
+        fixed_outname = paste(opt$out_name, "_",sep = "")
+    }else{
+        fixed_outname = opt$out_name
+    }
     AVARDA(
         opt$case_path,
         as.numeric(opt$threshold),
@@ -620,7 +625,7 @@ if(length(opt) < 10){
         opt$pairwise_path,
         opt$blast_path,
         fixed_outpath,
-        opt$out_name,
+        fixed_outname,
         opt$avarda_names
     )
 }
