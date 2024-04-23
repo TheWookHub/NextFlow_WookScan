@@ -511,7 +511,7 @@ AVARDA = function(case_path,thresh,dict_path,total_path,pairwise_path,blast_path
         # run the subsetting step given input of the total null probs, sample column, 
         # enrichment threshold and hte Virus blast matrix.
         # rank <- total_calc(case,R,enrich,total,blast)
-        print(paste("R:",R,'of',dim(case)[2]-1))
+        # print(paste("R:",R,'of',dim(case)[2]-1))
         rank <- total_calc(case,R,thresh,total,blast)
         if(is.null(rank) == FALSE){
             # take subset matrix from above and do all reassignments with pairwise and total null probabilities
@@ -596,8 +596,6 @@ AVARDA = function(case_path,thresh,dict_path,total_path,pairwise_path,blast_path
 # Prepare data from user params #
 #################################
 
-message("Checking out correct usage of optparse")
-print(length(opt))
 if(length(opt) < 10){  
     helpMsg(opt)
 }else{
@@ -610,12 +608,10 @@ if(length(opt) < 10){
     # just make sure that this results in a path otherwise
     # you'll get some funky names
     if(length(grep('\\/$', opt$out_path)) < 1){
-        fixed_outpath = paste(opt$out_path + "/",sep = "")
+        fixed_outpath = paste(opt$out_path, "/",sep = "")
     }else{
         fixed_outpath = opt$out_path
     }
-    print(paste("Fixed outpath:",fixed_outpath))
-    # AVARDA(input[[1]],as.numeric(input[[2]]),input[[3]],input[[4]],input[[5]],input[[6]],input[[7]],input[[8]],input[[9]])
     AVARDA(
         opt$case_path,
         as.numeric(opt$threshold),
