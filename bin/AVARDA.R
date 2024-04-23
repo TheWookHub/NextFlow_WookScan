@@ -240,6 +240,9 @@ AVARDA = function(case_path,thresh,dict_path,total_path,pairwise_path,blast_path
             }
             total_unique_peptides = sum(x_1_sum)+sum(temp)
             all_unique_peptide_ids = list(c(x_1_ids,unlist(x_2_ids)))
+            if(length(all_unique_peptide_ids) < 1){
+                all_unique_peptide_ids = list(c(""))
+            }
             # return(sum(x_1_sum)+sum(temp))
             return(c(total_unique_peptides, all_unique_peptide_ids))
         }
@@ -249,7 +252,7 @@ AVARDA = function(case_path,thresh,dict_path,total_path,pairwise_path,blast_path
         # returning the length of the nodes and the node id (peptide id)
         # is good
         if(dim(links_filtered)[1]==0){
-            return(c(length(nodes),nodes))
+            return(c(length(nodes),list(c(""))))
         }
     }
 
@@ -271,7 +274,7 @@ AVARDA = function(case_path,thresh,dict_path,total_path,pairwise_path,blast_path
         #if(length(N_rank)!=length(unlist(N_rank_2))){
         N_rank = N_rank[!N_rank %in% v_xr]
         # this is by default zero for total binom calculation
-        N_rank = N_rank[!N_rank %in% (v_i %in% v_i_j)] 
+        N_rank = N_rank[!N_rank %in% (v_i %in% v_i_j)]
         unique_n_ranks = filter(dict,N_rank)
         N_rank_f = unique_n_ranks[[1]]
         N_rank_ids = unique_n_ranks[[2]]
@@ -286,7 +289,7 @@ AVARDA = function(case_path,thresh,dict_path,total_path,pairwise_path,blast_path
     }
   
     # --- Total calc function --- #
-    # subsetting cases and also ranks peptides
+    # sub-setting cases and also ranks peptides
     total_calc  = function(case,column,thresh,total,blast){ 
         # Processing of the blast virus matrix on a case by case 
         total_probs = total
@@ -294,8 +297,14 @@ AVARDA = function(case_path,thresh,dict_path,total_path,pairwise_path,blast_path
         enriched = data.frame(case[,c(1,column+1)],row.names = 1) 
         # subset on enrichment matrix peptides that are greater than user defined threshold
         enriched = subset(enriched,enriched >=thresh)
+        
+        # previous code looks for an "enrich" with length > 0. enrich is defined as thresh in the super
+        # function. Since Thresh is a numeric,the length will always bit > 0. Hence it should
+        # be a typo. The if case should refer to 'enriched' dataframe rather than 'enrich' 
+        # the threshold value.
+        # if(length(enrich>0)){
         # As long as dataframe has 1 column
-        if(length(enrich>0)){
+        if(length(enriched>0)){
             # if data frame has more than 1600 rows
             # NOTE: unsure why original authors put 1600 as a factor for limiting 
             # number of peptides?
@@ -361,7 +370,7 @@ AVARDA = function(case_path,thresh,dict_path,total_path,pairwise_path,blast_path
         final_matrix = data.frame(matrix(0,nrow = dim(fullmatrix_sorted_ij)[1],ncol =dim(fullmatrix_sorted_ij)[2])) #initialize the final matrix of peptide-virus alignments post reassignment
         N_rank = rownames(fullmatrix_sorted_ij)
         z = N_rank
-        output = data.frame(matrix(ncol = 10, nrow =  dim(fullmatrix_sorted_ij)[2])) #initialize matrix for final data with significance data
+        output = data.frame(matrix(ncol = 11, nrow =  dim(fullmatrix_sorted_ij)[2])) #initialize matrix for final data with significance data
         sim_tag = data.frame(matrix(ncol = 2)) #empty vector to fill with virus pairs that are sim-tagged
         x1 = 1
         ##
@@ -428,7 +437,7 @@ AVARDA = function(case_path,thresh,dict_path,total_path,pairwise_path,blast_path
                         }
                     }                
                     fullmatrix_sorted_ij = cbind(fullmatrix_sorted_ij[1:R1],fullmatrix_sorted_ij[order(order)+R1])
-                    print(dim(fullmatrix_sorted_ij))
+                    # print(dim(fullmatrix_sorted_ij))
                 }
             }
             ## at this point all viruses are evaluated so just need final ranking step
@@ -439,14 +448,27 @@ AVARDA = function(case_path,thresh,dict_path,total_path,pairwise_path,blast_path
             probability_i = total_probs[grep(paste0(colnames(fullmatrix_sorted_ij[R1]),"$",collapse = ""),unlist(total_probs[,1])),2] # call the null probability for virus x
             final_rank = binom_test(rownames(final_i),rownames(final_xr),0,N_rank,probability_i)
             final_i_e = subset(final,final>=80)
-            output[R1,] = c(virus_i,final_rank[1],paste(rownames(final_i_e),collapse = "|"),paste(rownames(final_xr),collapse = "|"),length(N_rank),length(rownames(final_i_e)),length(rownames(final_xr)),final_rank[2],final_rank[3],probability_i)            
+            output[R1,] = c(
+                virus_i, #1 - virus name
+                final_rank[1], #2 - p-value
+                paste(rownames(final_i_e),collapse = "|"),#3 - evidence peptide id
+                paste(rownames(final_xr),collapse = "|"),#4 - cross reactive peptide id
+                length(N_rank),#5 N_rank - Num of peptides considered
+                length(rownames(final_i_e)), #6 number of evidence peptides
+                length(rownames(final_xr)), #7 number of cross reactive peptides
+                final_rank[2],#8 - number of Filtered Evidence peptides
+                paste(final_rank[[4]],collapse = "|"),#9 - number of Filtered Evidence peptides
+                final_rank[3],#10 - Filtered N-rank number
+                probability_i #11 -Null Probability
+            )
             N_rank = z    ## set the N_rank for the next virus_i to be reduced by those assigned to the previous virus_i
             setTxtProgressBar(pb, R1)        
         }
         close(pb)
         index = which(output[,2]!=1)
         a123 = cbind(output,1)
-        a123[index,11] = p.adjust(output[index,2],"BH")
+        # a123[index,11] = p.adjust(output[index,2],"BH") # bh column
+        a123[index,12] = p.adjust(output[index,2],"BH") #
         last = list(a123,sim_tag,fullmatrix_sorted_ij)
         return(last)
     }  
@@ -455,25 +477,32 @@ AVARDA = function(case_path,thresh,dict_path,total_path,pairwise_path,blast_path
     simtag  = function(last){
         results = as.data.frame(last[1]) #take the virus of two 
         results = cbind(results,0) # 
-        table = as.data.frame(last[2]) #
+        table = as.data.frame(last[2]) # The indistinguisables
         names = subset(results[,1],results[,2]<.05)
         table = subset(table,table[,1] %in% names)
         table = subset(table,table[,2] %in% names)
         
         if(dim(table)[1]!=0){
-            net <- as.undirected(graph_from_data_frame(table, directed=F) )
-            max =  max_cliques(net,min = 2) 
+            # create a network of indistinguisables
+            net <- as.undirected(graph_from_data_frame(table, directed=F))
+            # find the max cliques in the network (min size = 2)
+            max =  max_cliques(net,min = 2)
+            # for each clique in the network..
             for(R in 1:length(max)){
+                # retrieve the vertex information and match the names of 
+                # the vertices with the results table. These will be given
+                # and indistinguishability tag id which is the clique id
+                # from max_clique function for this patient
                 names = induced_subgraph(net,max[[R]])
                 sim = as.data.frame(vertex_attr(names))
                 index = match(as.character(unlist(sim)),results[,1])
-                results[index,12] = paste(results[index,12],R,sep = "|")
+                results[index,13] = paste(results[index,13],R,sep = "|")
             }
         }
         return(results)
     }  
     
-    enrich = thresh # later implement so this can be changed??
+    # enrich = thresh # later implement so this can be changed??
     registerDoParallel(detectCores())
     #registerDoParallel(1)
     plate = list()
@@ -481,8 +510,11 @@ AVARDA = function(case_path,thresh,dict_path,total_path,pairwise_path,blast_path
         # zeta = foreach(R = 1:1,.combine=rbind) %dopar%{ #cycle through each patient column by column (goal is so be serialized)
         # zeta = foreach(R = 37,.combine=rbind) %dopar%{ #cycle through each patient column by column (goal is so be serialized)
         # zeta = for(R in 1:(dim(case)[2]-1)){ #cycle through each patient column by column (goal is so be serialized)        
-        rank <- total_calc(case,R,enrich,total,blast) # run the subsetting step given input of the total null probs, sample column, enrichment threshold and hte Virus blast matrix.
-        
+        print(paste("R =",R))
+        # run the subsetting step given input of the total null probs, sample column, 
+        # enrichment threshold and hte Virus blast matrix.
+        # rank <- total_calc(case,R,enrich,total,blast)
+        rank <- total_calc(case,R,thresh,total,blast)
         if(is.null(rank) == FALSE){
             # take subset matrix from above and do all reassignments with pairwise and total null probabilities
             sorted_table=pairwise_calc(total,pairwise, rank)
@@ -490,21 +522,35 @@ AVARDA = function(case_path,thresh,dict_path,total_path,pairwise_path,blast_path
             sorted_table_2 = simtag(sorted_table) 
             name = colnames(case[R+1])
             output = as.data.frame(sorted_table_2)
-            output[,12] =  gsub("^0\\||^0", '', output[,12])        
-            colnames(output) = c("Virus","P-value","Evidence Peptides","XR peptides","N-rank #","Evidence Peptide #","XR Peptide #","Filtered Evidence #","Filtered N-rank #","Null Probability","BH P-value","Indistinguishablity Groups")
+            output[,13] =  gsub("^0\\||^0", '', output[,13])
+            colnames(output) = c(
+                "Virus", #2
+                "P-value",#3
+                "Evidence_Peptide_Ids",#4
+                "XR_Peptides_Ids",
+                "N-rank #",
+                "Evidence_Peptide_Count",
+                "XR_Peptide",
+                "Filtered_Evidence_Count", #9
+                "Filtered_Evidence_Peptides_Ids",
+                "Filtered_N-rank #",#11
+                "Null_Probability",#12
+                "BH_P-value",#13
+                "Indistinguishable_Groups" #14
+            )
             fwrite(output,file = paste0(out_path,name,".csv"))        
             pool = cbind(name,output)
             return(pool)
         }
     }      
-    fwrite(as.data.frame(zeta[zeta[,9]>=3 & zeta[,12]<=.05,]),file = paste0(out_path,out_name,"AVARDA_compiled_full_output",".csv"))
+    fwrite(as.data.frame(zeta[zeta[,9]>=3 & zeta[,13]<=.05,]),file = paste0(out_path,out_name,"AVARDA_compiled_full_output",".csv"))
     empty_virus_1 = colnames(blast)[which(colnames(blast)%in%zeta$Virus == FALSE)]
     empty_virus = data.frame(matrix(NA,ncol = length(unique(zeta$name))+1,nrow = length(empty_virus_1)))
     empty_virus[,1] = empty_virus_1
-    fwrite(rbindlist(list(zeta %>% select(name, Virus,`Evidence Peptides`) %>% spread(name,`Evidence Peptides`,fill = 0),empty_virus)),file = paste0(out_path,out_name,"AVARDA_evidence_pep",".csv"))
-    fwrite(rbindlist(list(zeta %>% select(name, Virus,`Evidence Peptide #`) %>% spread(name,`Evidence Peptide #`,fill = 0),empty_virus)),file = paste0(out_path,out_name,"AVARDA_unfiltered_evidence_number",".csv"))
-    fwrite(rbindlist(list(zeta %>% select(name, Virus,`Filtered Evidence #`) %>% spread(name,`Filtered Evidence #`,fill = 0),empty_virus)),file = paste0(out_path,out_name,"AVARDA_breadth",".csv"))
-    fwrite(rbindlist(list(zeta %>% select(name, Virus,`BH P-value`) %>% spread(name,`BH P-value`,fill = 1),empty_virus)),file = paste0(out_path,out_name,"AVARDA_post_p_value_BH",".csv"))
+    fwrite(rbindlist(list(zeta %>% select(name, Virus,`Evidence_Peptides`) %>% spread(name,`Evidence_Peptides`,fill = 0),empty_virus)),file = paste0(out_path,out_name,"AVARDA_evidence_pep",".csv"))
+    fwrite(rbindlist(list(zeta %>% select(name, Virus,`Evidence_Peptide_Count`) %>% spread(name,`Evidence_Peptide_Count`,fill = 0),empty_virus)),file = paste0(out_path,out_name,"AVARDA_unfiltered_evidence_number",".csv"))
+    fwrite(rbindlist(list(zeta %>% select(name, Virus,`Filtered_Evidence_Count`) %>% spread(name,`Filtered_Evidence_Count`,fill = 0),empty_virus)),file = paste0(out_path,out_name,"AVARDA_breadth",".csv"))
+    fwrite(rbindlist(list(zeta %>% select(name, Virus,`BH_P-value`) %>% spread(name,`BH_P-value`,fill = 1),empty_virus)),file = paste0(out_path,out_name,"AVARDA_post_p_value_BH",".csv"))
     fwrite(rbindlist(list(zeta %>% select(name, Virus,`P-value`) %>% spread(name,`P-value`,fill = 1),empty_virus)),file = paste0(out_path,out_name,"AVARDA_post_p_value",".csv"))
 }
 
@@ -524,17 +570,17 @@ if(length(opt) < 10){
     dir.create(opt$out_path)
     }
     # AVARDA(input[[1]],as.numeric(input[[2]]),input[[3]],input[[4]],input[[5]],input[[6]],input[[7]],input[[8]],input[[9]])
-    # AVARDA(
-    #     opt$case_path,
-    #     as.numeric(opt$threshold),
-    #     opt$dict_path,
-    #     opt$total_path,
-    #     opt$pairwise_path,
-    #     opt$blast_path,
-    #     opt$out_path,
-    #     opt$out_name,
-    #     opt$avarda_names
-    # )
+    AVARDA(
+        opt$case_path,
+        as.numeric(opt$threshold),
+        opt$dict_path,
+        opt$total_path,
+        opt$pairwise_path,
+        opt$blast_path,
+        opt$out_path,
+        opt$out_name,
+        opt$avarda_names
+    )
 }
 
   
