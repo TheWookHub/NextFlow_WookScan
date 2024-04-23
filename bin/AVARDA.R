@@ -504,16 +504,14 @@ AVARDA = function(case_path,thresh,dict_path,total_path,pairwise_path,blast_path
     
     # enrich = thresh # later implement so this can be changed??
     registerDoParallel(detectCores())
-    #registerDoParallel(1)
-    plate = list()
-    zeta = foreach(R = 1:(dim(case)[2]-1),.combine=rbind) %dopar%{ #cycle through each patient column by column (goal is so be serialized)
-        # zeta = foreach(R = 1:1,.combine=rbind) %dopar%{ #cycle through each patient column by column (goal is so be serialized)
-        # zeta = foreach(R = 37,.combine=rbind) %dopar%{ #cycle through each patient column by column (goal is so be serialized)
-        # zeta = for(R in 1:(dim(case)[2]-1)){ #cycle through each patient column by column (goal is so be serialized)        
-        print(paste("R =",R))
+    # registerDoParallel(1)
+    # plate = list()
+    # cycle through each patient column by column (goal is so be serialized)
+    zeta = foreach(R = 1:(dim(case)[2]-1),.combine=rbind) %dopar%{
         # run the subsetting step given input of the total null probs, sample column, 
         # enrichment threshold and hte Virus blast matrix.
         # rank <- total_calc(case,R,enrich,total,blast)
+        print(paste("R:",R,'of',dim(case)[2]-1))
         rank <- total_calc(case,R,thresh,total,blast)
         if(is.null(rank) == FALSE){
             # take subset matrix from above and do all reassignments with pairwise and total null probabilities
@@ -538,20 +536,60 @@ AVARDA = function(case_path,thresh,dict_path,total_path,pairwise_path,blast_path
                 "BH_P-value",#13
                 "Indistinguishable_Groups" #14
             )
-            fwrite(output,file = paste0(out_path,name,".csv"))        
+            fwrite(output,file = paste0(out_path,name,".csv"))
             pool = cbind(name,output)
             return(pool)
         }
-    }      
+    }
     fwrite(as.data.frame(zeta[zeta[,9]>=3 & zeta[,13]<=.05,]),file = paste0(out_path,out_name,"AVARDA_compiled_full_output",".csv"))
     empty_virus_1 = colnames(blast)[which(colnames(blast)%in%zeta$Virus == FALSE)]
     empty_virus = data.frame(matrix(NA,ncol = length(unique(zeta$name))+1,nrow = length(empty_virus_1)))
     empty_virus[,1] = empty_virus_1
-    fwrite(rbindlist(list(zeta %>% select(name, Virus,`Evidence_Peptides`) %>% spread(name,`Evidence_Peptides`,fill = 0),empty_virus)),file = paste0(out_path,out_name,"AVARDA_evidence_pep",".csv"))
-    fwrite(rbindlist(list(zeta %>% select(name, Virus,`Evidence_Peptide_Count`) %>% spread(name,`Evidence_Peptide_Count`,fill = 0),empty_virus)),file = paste0(out_path,out_name,"AVARDA_unfiltered_evidence_number",".csv"))
-    fwrite(rbindlist(list(zeta %>% select(name, Virus,`Filtered_Evidence_Count`) %>% spread(name,`Filtered_Evidence_Count`,fill = 0),empty_virus)),file = paste0(out_path,out_name,"AVARDA_breadth",".csv"))
-    fwrite(rbindlist(list(zeta %>% select(name, Virus,`BH_P-value`) %>% spread(name,`BH_P-value`,fill = 1),empty_virus)),file = paste0(out_path,out_name,"AVARDA_post_p_value_BH",".csv"))
-    fwrite(rbindlist(list(zeta %>% select(name, Virus,`P-value`) %>% spread(name,`P-value`,fill = 1),empty_virus)),file = paste0(out_path,out_name,"AVARDA_post_p_value",".csv"))
+    
+    asdf = zeta %>% select(name, Virus,`Evidence_Peptide_Ids`) %>% spread(name,`Evidence_Peptide_Ids`,fill = 0)
+    fwrite(
+        rbindlist(
+            list(asdf,empty_virus),
+            use.names = FALSE
+        ),
+        file = paste0(out_path,out_name,"AVARDA_evidence_pep",".csv")
+    )
+    
+    asdf = zeta %>% select(name, Virus,`Evidence_Peptide_Count`) %>% spread(name,`Evidence_Peptide_Count`,fill = 0)
+    fwrite(
+        rbindlist(
+            list(asdf,empty_virus),
+            use.names = FALSE
+        ),
+        file = paste0(out_path,out_name,"AVARDA_unfiltered_evidence_number",".csv")
+    )
+    
+    asdf = zeta %>% select(name, Virus,`Filtered_Evidence_Count`) %>% spread(name,`Filtered_Evidence_Count`,fill = 0)
+    fwrite(
+        rbindlist(
+            list(asdf,empty_virus),
+            use.names = FALSE
+        ),
+        file = paste0(out_path,out_name,"AVARDA_breadth",".csv")
+    )
+    
+    asdf = zeta %>% select(name, Virus,`BH_P-value`) %>% spread(name,`BH_P-value`,fill = 1)
+    fwrite(
+        rbindlist(
+            list(asdf,empty_virus),
+            use.names = FALSE
+        ),
+        file = paste0(out_path,out_name,"AVARDA_post_p_value_BH",".csv")
+    )
+    
+    asdf = zeta %>% select(name, Virus,`P-value`) %>% spread(name,`P-value`,fill = 1)
+    fwrite(
+        rbindlist(
+            list(asdf,empty_virus),
+            use.names = FALSE
+        ),
+        file = paste0(out_path,out_name,"AVARDA_post_p_value",".csv")
+    )
 }
 
 #################################
@@ -564,11 +602,19 @@ if(length(opt) < 10){
     helpMsg(opt)
 }else{
     if(dir.exists(opt$out_path)){
-    message(paste(opt$out_path, "exists! Using existing directory.."))
+        message(paste(opt$out_path, "exists! Using existing directory.."))
     }else{
-    message(paste(opt$out_path,"not found! Creating new directory.."))
-    dir.create(opt$out_path)
+        message(paste(opt$out_path,"not found! Creating new directory.."))
+        dir.create(opt$out_path)
     }
+    # just make sure that this results in a path otherwise
+    # you'll get some funky names
+    if(length(grep('\\/$', opt$out_path)) < 1){
+        fixed_outpath = paste(opt$out_path + "/",sep = "")
+    }else{
+        fixed_outpath = opt$out_path
+    }
+    print(paste("Fixed outpath:",fixed_outpath))
     # AVARDA(input[[1]],as.numeric(input[[2]]),input[[3]],input[[4]],input[[5]],input[[6]],input[[7]],input[[8]],input[[9]])
     AVARDA(
         opt$case_path,
@@ -577,7 +623,7 @@ if(length(opt) < 10){
         opt$total_path,
         opt$pairwise_path,
         opt$blast_path,
-        opt$out_path,
+        fixed_outpath,
         opt$out_name,
         opt$avarda_names
     )
