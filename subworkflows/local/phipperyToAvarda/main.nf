@@ -38,4 +38,9 @@ workflow PHIPPERYTOAVARDA{
 
     main:
     PHIPOUTPUT(upep_prefix_ch,data_phip_ch)
+
+    emit:
+    virlib = PHIPOUTPUT.out.virlib
+    edgeRhits = PHIPOUTPUT.out.edgeRhits
+    
 }

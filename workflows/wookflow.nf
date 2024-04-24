@@ -12,6 +12,7 @@
 // include { methodsDescriptionText } from '../subworkflows/local/utils_nfcore_wookflow_pipeline'
 include { PHIPPERY                } from '../subworkflows/local/phippery/main.nf'
 include { PHIPPERYTOAVARDA        } from '../subworkflows/local/phipperyToAvarda/main.nf'
+include { AVARDA                  } from '../subworkflows/local/AVARDA/main.nf'
 /*
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     RUN MAIN WORKFLOW
@@ -92,7 +93,7 @@ workflow WOOKFLOW {
     // RUN: PHIPPERY
     //    
     if(params.run_phippery == true){        
-        log.info """\
+        log.info """
             --------------------------------------
             WookScan uses: P H I P - F L O W!
             --------------------------------------
@@ -109,7 +110,7 @@ workflow WOOKFLOW {
 
             
             --------------------------------------
-            WookScan Custom Scripts
+            WookScan Custom Scripts: PhipOut
             --------------------------------------
             Phippery output to AVARDA is developed by:
             Preston Leung
@@ -119,6 +120,48 @@ workflow WOOKFLOW {
         """.stripIndent()
         PHIPPERY()        
         PHIPPERYTOAVARDA(PHIPPERY.out)
+    }
+
+    if(params.RUN_AVARDA == True){        
+        if(params.run_phippery == True){
+            // If we take stuff directly from phippery output
+            log.info """
+            --------------------------------------
+            WookScan Custom Scripts: AVARDA - A
+            --------------------------------------
+            AVARDA is developed by:
+            Monaco et al.
+
+            Modification performed by:
+            Preston Leung
+            ================================
+            virlib      : $PHIPPERYTOAVARDA.out.virlib
+            edgeRhits   : $PHIPPERYTOAVARDA.out.edgeRhits
+
+            """.stripIndent()
+            virlib = PHIPPERYTOAVARDA.out.virlib
+            edgeRhits = PHIPPERYTOAVARDA.out.edgeRhits
+        }else{
+            // We're running AVARDA by itself
+            log.info """
+            --------------------------------------
+            WookScan Custom Scripts: AVARDA - B
+            --------------------------------------
+            AVARDA is developed by:
+            Monaco et al.
+
+            Modification performed by:
+            Preston Leung
+            ================================
+            virlib      : $params.avarda_names
+            edgeRhits   : $params.case_path
+            
+
+            """.stripIndent()
+            virlib = Channel.fromPath(params.avarda_names)
+            edgeRhits =  Channel.fromPath(params.case_path)
+        }
+        AVARDA(virlib, edgeRhits)
     }
 }
 
