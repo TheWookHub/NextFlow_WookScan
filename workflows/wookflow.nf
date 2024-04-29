@@ -122,8 +122,8 @@ workflow WOOKFLOW {
         PHIPPERYTOAVARDA(PHIPPERY.out)
     }
 
-    if(params.RUN_AVARDA == True){        
-        if(params.run_phippery == True){
+    if(params.run_AVARDA == true){        
+        if(params.run_phippery == true){
             // If we take stuff directly from phippery output
             log.info """
             --------------------------------------

@@ -1,5 +1,8 @@
 process AVARDAOUT{
+    container = 'docker.io/pdawgzgg/avarda_r_env:0.1'
+    // containerOptions = "--volume $baseDir/bin/:/Tools/"    
     publishDir "$params.out_path", mode: 'copy', overwrite: true
+    debug true
     input:
         path case_path
         val threshold
@@ -9,24 +12,18 @@ process AVARDAOUT{
         path blast_path
         val out_path
         val out_name
-        path avarda_names
-    
+        path avarda_names    
     script:
     """
-    echo 
-        case_path:          $case_path
-        avarda_names:       $avarda_names
+    AVARDA.R \
+        --case_path $case_path \
+        --threshold $threshold \
+        --dict_path $dict_path \
+        --total_path $total_path \
+        --pairwise_path $pairwise_path \
+        --blast_path $blast_path \
+        --out_path $out_path \
+        --out_name $out_name  \
+        --avarda_names $avarda_names
     """
-        // '''
-        //     Rscript AVARDA.R \
-        //     --case_path /home/preston/PhIPSeq-Pipelines/nf-core-wookflow/subworkflows/local/AVARDA/data/example_input/AVARDA_test_data.tsv.gz \
-        //     --threshold 1 \
-        //     --dict_path /home/preston/PhIPSeq-Pipelines/nf-core-wookflow/subworkflows/local/AVARDA/data/dict_path/my_df.csv.gz \
-        //     --total_path /home/preston/PhIPSeq-Pipelines/nf-core-wookflow/subworkflows/local/AVARDA/data/total_path/total_probability_xr2.csv \
-        //     --pairwise_path /home/preston/PhIPSeq-Pipelines/nf-core-wookflow/subworkflows/local/AVARDA/data/pairwise_path/unique_probabilities3.csv \
-        //     --blast_path /home/preston/PhIPSeq-Pipelines/nf-core-wookflow/subworkflows/local/AVARDA/data/blast_path/VirScan_filtered_virus_blast_new.csv.gz \
-        //     --out_path /home/preston/PhIPSeq-Pipelines/AVARDA_Runs/TestWookflow_AVARDA \
-        //     --out_name WATERMELON  \
-        //     --avarda_names /home/preston/PhIPSeq-Pipelines/nf-core-wookflow/subworkflows/local/AVARDA/data/avarda_names/avarda_names.csv.gz
-        // '''
 }

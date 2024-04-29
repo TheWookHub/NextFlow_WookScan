@@ -24,6 +24,7 @@ process run_edgeR {
     run_edgeR.Rscript ${params.edgeR_threshold}
     """
 }
+
 //mv PhIPData.rds ${params.dataset_prefix}.rds
 
 process run_BEER {
@@ -79,8 +80,7 @@ process append_assay_csvs_to_xarray {
 workflow edgeR_BEER_workflows {
     take:
         ds
-    main:
-
+    main:    
     if ( params.run_BEER )
         ds | to_csv \
             | run_edgeR \
@@ -90,7 +90,7 @@ workflow edgeR_BEER_workflows {
         ds | to_csv \
             | run_edgeR \
             | (append_assay_csvs_to_xarray & publish_rds)
-
+    
     emit:
         append_assay_csvs_to_xarray.out
 
