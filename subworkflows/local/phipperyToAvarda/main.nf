@@ -30,7 +30,10 @@ include { PHIPOUTPUT } from '../../../modules/local/phipout/main.nf'
 */
 // include { VIRALDB } from '../../../modules/local/phipout/main.nf'
 
-upep_prefix_ch = Channel.value(params.user_pep_id)
+if(params.run_phippery){
+    upep_prefix_ch = Channel.value(params.user_pep_id)
+}
+
 
 workflow PHIPPERYTOAVARDA{
     take:

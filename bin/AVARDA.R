@@ -23,7 +23,7 @@ suppressWarnings(
 optList = c(
     "case_path","threshold","dict_path","total_path",
     "pairwise_path","blast_path","out_path","out_name",
-    "avarda_names"
+    "avarda_names","no_pb"
 )
 
 ######################################################
@@ -90,6 +90,12 @@ option_list = list(
             "Table (.csv) with 2 columns. First column stores user peptide id (matching with file in case_path).",
             "Second column are the peptide id from the library."
         )
+    ),
+    make_option(
+        c("--show_pb"),
+        action = "store_true",
+        default = FALSE,
+        help = "Flag to show printing progress bar."
     )    
 )
 
@@ -123,7 +129,7 @@ helpMsg = function(input_param){
   message("Exit.")
 }
 
-AVARDA = function(case_path,thresh,dict_path,total_path,pairwise_path,blast_path,out_path,out_name,avarda_names){    
+AVARDA = function(case_path,thresh,dict_path,total_path,pairwise_path,blast_path,out_path,out_name,avarda_names,showPB){    
     # read in peptide-peptide dictionary
     dict =  data.frame(fread(dict_path,data.table = FALSE))
     # read in null probability table 
@@ -332,9 +338,11 @@ AVARDA = function(case_path,thresh,dict_path,total_path,pairwise_path,blast_path
                         fullmatrix_sorted = blast_subset
                         v_i_j = NULL
                         order = c()
-                        virus = c()            
-                        pb <- txtProgressBar(min = 0, max =dim(fullmatrix_sorted)[2], style = 3)
-                         # For each virus (column) we go through it.
+                        virus = c()
+                        if(showPB){
+                            pb <- txtProgressBar(min = 0, max =dim(fullmatrix_sorted)[2], style = 3)
+                        }                        
+                        # For each virus (column) we go through it.
                         for(R in 1:dim(fullmatrix_sorted)[2]){
                             # get pep_ids that align crossreactively to virus_i                            
                             virus_i_xr = rownames(fullmatrix_sorted)[fullmatrix_sorted[,R]>0 & fullmatrix_sorted[,R]<80]
@@ -348,7 +356,10 @@ AVARDA = function(case_path,thresh,dict_path,total_path,pairwise_path,blast_path
                             order[R] = x[1] 
                             # get which virus is being compared in interation
                             virus[R] = colnames(fullmatrix_sorted[R]) 
-                            setTxtProgressBar(pb, R)
+                            if(showPB){
+                                setTxtProgressBar(pb, R)
+                            }
+                            
                         }
                         #reorder the subset virus-peptide blast matrix by likelihood of infection
                         results = fullmatrix_sorted[,order(unlist(order))]
@@ -374,8 +385,9 @@ AVARDA = function(case_path,thresh,dict_path,total_path,pairwise_path,blast_path
         sim_tag = data.frame(matrix(ncol = 2)) #empty vector to fill with virus pairs that are sim-tagged
         x1 = 1
         ##
-        
-        pb <- txtProgressBar(min = 0, max = dim(fullmatrix_sorted_ij)[2], style = 3)
+        if(showPB){
+            pb <- txtProgressBar(min = 0, max = dim(fullmatrix_sorted_ij)[2], style = 3)
+        }        
         for(R1 in 1: dim(fullmatrix_sorted_ij)[2]){ # test
             # for(R1 in 1: 13){ # test            
             virus_i = colnames(fullmatrix_sorted_ij)[R1] # get name of virus_i
@@ -462,9 +474,14 @@ AVARDA = function(case_path,thresh,dict_path,total_path,pairwise_path,blast_path
                 probability_i #11 -Null Probability
             )
             N_rank = z    ## set the N_rank for the next virus_i to be reduced by those assigned to the previous virus_i
-            setTxtProgressBar(pb, R1)        
+            if(showPB){
+                setTxtProgressBar(pb, R1)
+            }
+            
         }
-        close(pb)
+        if(showPB){
+            close(pb)
+        }        
         index = which(output[,2]!=1)
         a123 = cbind(output,1)
         # a123[index,11] = p.adjust(output[index,2],"BH") # bh column
@@ -626,7 +643,8 @@ if(length(opt) < 10){
         opt$blast_path,
         fixed_outpath,
         fixed_outname,
-        opt$avarda_names
+        opt$avarda_names,
+        opt$show_pb
     )
 }
 

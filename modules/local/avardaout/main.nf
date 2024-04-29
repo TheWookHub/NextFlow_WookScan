@@ -24,6 +24,6 @@ process AVARDAOUT{
         --blast_path $blast_path \
         --out_path $out_path \
         --out_name $out_name  \
-        --avarda_names $avarda_names
+        --avarda_names $avarda_names        
     """
 }

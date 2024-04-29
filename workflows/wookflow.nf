@@ -92,7 +92,7 @@ workflow WOOKFLOW {
     //
     // RUN: PHIPPERY
     //    
-    if(params.run_phippery == true){        
+    if(params.run_phippery){        
         log.info """
             --------------------------------------
             WookScan uses: P H I P - F L O W!
@@ -122,8 +122,8 @@ workflow WOOKFLOW {
         PHIPPERYTOAVARDA(PHIPPERY.out)
     }
 
-    if(params.run_AVARDA == true){        
-        if(params.run_phippery == true){
+    if(params.run_AVARDA){        
+        if(params.run_phippery){
             // If we take stuff directly from phippery output
             log.info """
             --------------------------------------
