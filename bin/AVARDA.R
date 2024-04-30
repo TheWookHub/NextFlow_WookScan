@@ -645,13 +645,13 @@ if(length(opt) < 10){
 
     MAXCORE = detectCores()
     if(opt$cores != NUMCORE){
-        if(NUMCORE > MAXCORE){
+        if(opt$cores > MAXCORE){
             NUMCORE = MAXCORE
         }else{
             NUMCORE = opt$cores
         }
     }
-    
+
     AVARDA(
         opt$case_path,
         as.numeric(opt$threshold),
