@@ -12,7 +12,6 @@ TO BE FILLED!
 
 ```
 # Running Phippery Only #
-
 nextflow run /home/preston/PhIPSeq-Pipelines/nf-core-wookflow/main.nf \
 --run_phippery True \
 -profile docker \
@@ -25,9 +24,38 @@ nextflow run /home/preston/PhIPSeq-Pipelines/nf-core-wookflow/main.nf \
 --outdir ../TestWookFlow/ \
 --dataset_prefix "data"
 
-# 
+# Running Phippery & AVARDA #
+nextflow run ../nf-core-wookflow/main.nf \
+--run_phippery True \
+--run_AVARDA True \
+-profile docker \
+--peptide_table InputFiles/peptide_table_VIR3_full_v2.csv \
+--sample_table InputFiles/sample_table_UNSW_VirScan.csv \
+--run_cpm_enr_workflow True \
+--oligo_tile_length 50 \
+--read_length 51 \
+--results ../WookScanNextFlowTest2/TestWookFlowPhippery \
+--outdir ../WookScanNextFlowTest2/ \
+--dict_path ../nf-core-wookflow/subworkflows/local/AVARDA/data/dict_path/blastp_peptide_edges.csv.gz \
+--total_path ../nf-core-wookflow/subworkflows/local/AVARDA/data/total_path/sequence_RefSeqOnly_bitscore80plus_total_probability_xr2.csv \
+--pairwise_path ../nf-core-wookflow/subworkflows/local/AVARDA/data/pairwise_path/sequence_RefSeqOnly_bitscore80plus_unique_probabilities.csv \
+--blast_path ../nf-core-wookflow/subworkflows/local/AVARDA/data/blast_path/sequence_RefSeqOnly_bitscore80plus_bitScore.csv.gz \
+--out_path ../WookScanNextFlowTest2/TestWookFlow2_AVARDA \
+--out_name PHIPAVARDA
 
-
+# Running Only AVARDA #
+nextflow run ../nf-core-wookflow/main.nf \
+--run_AVARDA True \
+-profile docker \
+--outdir ../WookScanNextFlowTest2/ \
+--case ../nf-core-wookflow/subworkflows/local/AVARDA/data/example_input/AVARDA_test_data.tsv.gz \
+--dict_path ../nf-core-wookflow/subworkflows/local/AVARDA/data/dict_path/blastp_peptide_edges.csv.gz \
+--total_path ../nf-core-wookflow/subworkflows/local/AVARDA/data/total_path/sequence_RefSeqOnly_bitscore80plus_total_probability_xr2.csv \
+--pairwise_path ../nf-core-wookflow/subworkflows/local/AVARDA/data/pairwise_path/sequence_RefSeqOnly_bitscore80plus_unique_probabilities.csv \
+--blast_path ../nf-core-wookflow/subworkflows/local/AVARDA/data/blast_path/sequence_RefSeqOnly_bitscore80plus_bitScore.csv.gz \
+--out_path ../WookScanNextFlowTest2/TestWookFlow2_AVARDA \
+--out_name PHIPAVARDA \
+--avarda_names ../nf-core-wookflow/subworkflows/local/AVARDA/data/avarda_names/avarda_names.csv.gz
 ```
 
 

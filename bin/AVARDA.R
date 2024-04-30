@@ -101,7 +101,7 @@ option_list = list(
     ),
     make_option(
         c("--cores"),
-        action = "store"
+        action = "store",
         default = 4,
         help = "Number of cores to use. [Default = 4]",
         type = "integer"
