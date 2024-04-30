@@ -1,6 +1,5 @@
 process AVARDAOUT{
-    container = 'docker.io/pdawgzgg/avarda_r_env:0.1'
-    // containerOptions = "--volume $baseDir/bin/:/Tools/"    
+    container = 'docker.io/pdawgzgg/avarda_r_env:0.1'    
     publishDir "$params.out_path", mode: 'copy', overwrite: true
     debug true
     input:
@@ -12,7 +11,8 @@ process AVARDAOUT{
         path blast_path
         val out_path
         val out_name
-        path avarda_names    
+        path avarda_names
+        val cores    
     script:
     """
     AVARDA.R \
@@ -24,6 +24,7 @@ process AVARDAOUT{
         --blast_path $blast_path \
         --out_path $out_path \
         --out_name $out_name  \
-        --avarda_names $avarda_names        
+        --avarda_names $avarda_names \
+        --cores $cores
     """
 }

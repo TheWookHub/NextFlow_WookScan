@@ -23,8 +23,10 @@ suppressWarnings(
 optList = c(
     "case_path","threshold","dict_path","total_path",
     "pairwise_path","blast_path","out_path","out_name",
-    "avarda_names","no_pb"
+    "avarda_names","show_pb","cores"
 )
+
+NUMCORE = 4
 
 ######################################################
 # Defining arguments to be passed into AVARDA script #
@@ -96,6 +98,13 @@ option_list = list(
         action = "store_true",
         default = FALSE,
         help = "Flag to show printing progress bar."
+    ),
+    make_option(
+        c("--cores"),
+        action = "store"
+        default = 4,
+        help = "Number of cores to use. [Default = 4]",
+        type = "integer"
     )    
 )
 
@@ -520,8 +529,7 @@ AVARDA = function(case_path,thresh,dict_path,total_path,pairwise_path,blast_path
     }  
     
     # enrich = thresh # later implement so this can be changed??
-    registerDoParallel(detectCores())
-    # registerDoParallel(1)
+    registerDoParallel(NUMCORE)    
     # plate = list()
     # cycle through each patient column by column (goal is so be serialized)
     zeta = foreach(R = 1:(dim(case)[2]-1),.combine=rbind) %dopar%{
@@ -634,6 +642,16 @@ if(length(opt) < 10){
     }else{
         fixed_outname = opt$out_name
     }
+
+    MAXCORE = detectCores()
+    if(opt$cores != NUMCORE){
+        if(NUMCORE > MAXCORE){
+            NUMCORE = MAXCORE
+        }else{
+            NUMCORE = opt$cores
+        }
+    }
+    
     AVARDA(
         opt$case_path,
         as.numeric(opt$threshold),

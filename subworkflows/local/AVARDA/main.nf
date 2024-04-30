@@ -10,6 +10,7 @@ if(params.run_AVARDA){
     blast_ch = Channel.fromPath(params.blast_path)
     outpath_ch = Channel.value(params.out_path)
     outname_ch = Channel.value(params.out_name)
+    cores_ch = Channel.value(params.max_cpus)
 }
 
 workflow AVARDA{    
@@ -28,7 +29,8 @@ workflow AVARDA{
             blast_ch,
             outpath_ch,
             outname_ch,
-            virlib_ch
+            virlib_ch,
+            cores_ch
         )
 }
 

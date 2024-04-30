@@ -127,16 +127,17 @@ workflow WOOKFLOW {
             // If we take stuff directly from phippery output
             log.info """
             --------------------------------------
-            WookScan Custom Scripts: AVARDA - A
+            WookScan uses: AVARDA: PHIPPERY-AVARDA
             --------------------------------------
             AVARDA is developed by:
             Monaco et al.
+            Repository: https://github.com/drmonaco/AVARDA
 
             Modification performed by:
             Preston Leung
             ================================
-            virlib      : $PHIPPERYTOAVARDA.out.virlib
-            edgeRhits   : $PHIPPERYTOAVARDA.out.edgeRhits
+            virlib      : From PHIPPERYTOAVARDA.out.virlib
+            edgeRhits   : From PHIPPERYTOAVARDA.out.edgeRhits
 
             """.stripIndent()
             virlib = PHIPPERYTOAVARDA.out.virlib
@@ -145,7 +146,7 @@ workflow WOOKFLOW {
             // We're running AVARDA by itself
             log.info """
             --------------------------------------
-            WookScan Custom Scripts: AVARDA - B
+            WookScan uses: AVARDA: AVARDA ONLY
             --------------------------------------
             AVARDA is developed by:
             Monaco et al.
