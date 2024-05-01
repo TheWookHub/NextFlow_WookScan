@@ -20,6 +20,7 @@ suppressWarnings(
 # Global Variables for use #
 ############################
 
+
 optList = c(
     "case_path","threshold","dict_path","total_path",
     "pairwise_path","blast_path","out_path","out_name",
@@ -27,6 +28,7 @@ optList = c(
 )
 
 NUMCORE = 4
+DEFAULT_OUTPUTDIR = getwd()
 
 ######################################################
 # Defining arguments to be passed into AVARDA script #
@@ -78,7 +80,8 @@ option_list = list(
     make_option(
         c("--out_path"),
         action="store",
-        help = "Path to where you want to write the results to."
+        default = DEFAULT_OUTPUTDIR,
+        help = paste("Path to where you want to write the results to. [Default: ", DEFAULT_OUTPUTDIR,"]")
     ),
     make_option(
         c("--out_name"),
@@ -137,8 +140,7 @@ helpMsg = function(input_param){
   message(paste("The following required parameters has not defined:",paste(missing, collapse = ', ')))
   message("Exit.")
 }
-
-AVARDA = function(case_path,thresh,dict_path,total_path,pairwise_path,blast_path,out_path,out_name,avarda_names,showPB){    
+AVARDA = function(case_path,thresh,dict_path,total_path,pairwise_path,blast_path,out_path,out_name,avarda_names,showPB){
     # read in peptide-peptide dictionary
     dict =  data.frame(fread(dict_path,data.table = FALSE))
     # read in null probability table 
@@ -562,11 +564,13 @@ AVARDA = function(case_path,thresh,dict_path,total_path,pairwise_path,blast_path
                 "Indistinguishable_Groups" #14
             )
             fwrite(output,file = paste0(out_path,name,".csv"))
+            
             pool = cbind(name,output)
             return(pool)
         }
     }
     fwrite(as.data.frame(zeta[zeta[,9]>=3 & zeta[,13]<=.05,]),file = paste0(out_path,out_name,"AVARDA_compiled_full_output",".csv"))
+    
     empty_virus_1 = colnames(blast)[which(colnames(blast)%in%zeta$Virus == FALSE)]
     empty_virus = data.frame(matrix(NA,ncol = length(unique(zeta$name))+1,nrow = length(empty_virus_1)))
     empty_virus[,1] = empty_virus_1
@@ -577,7 +581,7 @@ AVARDA = function(case_path,thresh,dict_path,total_path,pairwise_path,blast_path
             list(asdf,empty_virus),
             use.names = FALSE
         ),
-        file = paste0(out_path,out_name,"AVARDA_evidence_pep",".csv")
+        file = paste0(out_path,out_name,"AVARDA_evidence_pep",".csv")        
     )
     
     asdf = zeta %>% select(name, Virus,`Evidence_Peptide_Count`) %>% spread(name,`Evidence_Peptide_Count`,fill = 0)
@@ -586,7 +590,7 @@ AVARDA = function(case_path,thresh,dict_path,total_path,pairwise_path,blast_path
             list(asdf,empty_virus),
             use.names = FALSE
         ),
-        file = paste0(out_path,out_name,"AVARDA_unfiltered_evidence_number",".csv")
+        file = paste0(out_path,out_name,"AVARDA_unfiltered_evidence_number",".csv")        
     )
     
     asdf = zeta %>% select(name, Virus,`Filtered_Evidence_Count`) %>% spread(name,`Filtered_Evidence_Count`,fill = 0)
@@ -621,7 +625,7 @@ AVARDA = function(case_path,thresh,dict_path,total_path,pairwise_path,blast_path
 # Prepare data from user params #
 #################################
 
-if(length(opt) < 10){  
+if(length(opt) < 10){
     helpMsg(opt)
 }else{
     if(dir.exists(opt$out_path)){
@@ -631,18 +635,18 @@ if(length(opt) < 10){
         dir.create(opt$out_path)
     }
     # just make sure that this results in a path otherwise
-    # you'll get some funky names
+    # you'll get some funky names    
     if(length(grep('\\/$', opt$out_path)) < 1){
         fixed_outpath = paste(opt$out_path, "/",sep = "")
     }else{
         fixed_outpath = opt$out_path
-    }
+    }    
     if(length(grep('_$', opt$out_name)) < 1){
         fixed_outname = paste(opt$out_name, "_",sep = "")
     }else{
         fixed_outname = opt$out_name
     }
-
+    
     MAXCORE = detectCores()
     if(opt$cores != NUMCORE){
         if(opt$cores > MAXCORE){

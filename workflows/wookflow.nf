@@ -107,7 +107,7 @@ workflow WOOKFLOW {
             peptide_table   : $params.peptide_table
             results         : $params.results
             reads_prefix    : $params.reads_prefix
-
+            publishDir      : $params.results
             
             --------------------------------------
             WookScan Custom Scripts: PhipOut
@@ -116,6 +116,7 @@ workflow WOOKFLOW {
             Preston Leung
             ================================
             user_pep_id     : $params.user_pep_id
+            publishDir      : $params.results
 
         """.stripIndent()
         PHIPPERY()        
@@ -138,6 +139,7 @@ workflow WOOKFLOW {
             ================================
             virlib      : From PHIPPERYTOAVARDA.out.virlib
             edgeRhits   : From PHIPPERYTOAVARDA.out.edgeRhits
+            publishDir  : $params.out_path
 
             """.stripIndent()
             virlib = PHIPPERYTOAVARDA.out.virlib
@@ -156,7 +158,7 @@ workflow WOOKFLOW {
             ================================
             virlib      : $params.avarda_names
             edgeRhits   : $params.case_path
-            
+            publishDir  : $params.out_path
 
             """.stripIndent()
             virlib = Channel.fromPath(params.avarda_names)

@@ -7,8 +7,7 @@ if(params.run_AVARDA){
     dict_ch = Channel.fromPath(params.dict_path)
     total_ch = Channel.fromPath(params.total_path)
     pairwse_ch = Channel.fromPath(params.pairwise_path)
-    blast_ch = Channel.fromPath(params.blast_path)
-    outpath_ch = Channel.value(params.out_path)
+    blast_ch = Channel.fromPath(params.blast_path)    
     outname_ch = Channel.value(params.out_name)
     cores_ch = Channel.value(params.max_cpus)
 }
@@ -26,8 +25,7 @@ workflow AVARDA{
             dict_ch,
             total_ch,
             pairwse_ch,
-            blast_ch,
-            outpath_ch,
+            blast_ch,            
             outname_ch,
             virlib_ch,
             cores_ch

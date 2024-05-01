@@ -1,7 +1,7 @@
 process AVARDAOUT{
-    label 'process_long'
-    container = 'docker.io/pdawgzgg/avarda_r_env:0.1'    
     publishDir "$params.out_path", mode: 'copy', overwrite: true
+    label 'process_long'
+    container = 'docker.io/pdawgzgg/avarda_r_env:0.1'
     debug true
     input:
         path case_path
@@ -10,11 +10,12 @@ process AVARDAOUT{
         path total_path
         path pairwise_path
         path blast_path
-        val out_path
         val out_name
         path avarda_names
-        val cores    
-    script:
+        val cores
+    output:
+        path "*.csv", emit: avarda_outs        
+    script:    
     """
     AVARDA.R \
         --case_path $case_path \
@@ -23,8 +24,7 @@ process AVARDAOUT{
         --total_path $total_path \
         --pairwise_path $pairwise_path \
         --blast_path $blast_path \
-        --out_path $out_path \
-        --out_name $out_name  \
+        --out_name $out_name \
         --avarda_names $avarda_names \
         --cores $cores
     """
