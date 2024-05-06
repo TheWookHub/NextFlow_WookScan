@@ -1,5 +1,13 @@
 #!/usr/bin/env Rscript
 
+# Original code developed by Monaco et al.
+# Publication: https://doi.org/10.1016/j.ebiom.2021.103747
+# Repository: https://github.com/drmonaco/AVARDA
+
+# Modifications to AVARDA.R was made by Preston Leung
+#
+
+
 ## Libraries required to run
 
 suppressWarnings(
@@ -140,6 +148,7 @@ helpMsg = function(input_param){
   message(paste("The following required parameters has not defined:",paste(missing, collapse = ', ')))
   message("Exit.")
 }
+
 AVARDA = function(case_path,thresh,dict_path,total_path,pairwise_path,blast_path,out_path,out_name,avarda_names,showPB){
     # read in peptide-peptide dictionary
     dict =  data.frame(fread(dict_path,data.table = FALSE))
@@ -536,7 +545,7 @@ AVARDA = function(case_path,thresh,dict_path,total_path,pairwise_path,blast_path
     # cycle through each patient column by column (goal is so be serialized)
     zeta = foreach(R = 1:(dim(case)[2]-1),.combine=rbind) %dopar%{
         # run the subsetting step given input of the total null probs, sample column, 
-        # enrichment threshold and hte Virus blast matrix.
+        # enrichment threshold and the Virus blast matrix.
         # rank <- total_calc(case,R,enrich,total,blast)
         # print(paste("R:",R,'of',dim(case)[2]-1))
         rank <- total_calc(case,R,thresh,total,blast)
