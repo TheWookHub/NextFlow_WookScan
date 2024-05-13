@@ -561,10 +561,10 @@ AVARDA = function(case_path,thresh,dict_path,total_path,pairwise_path,blast_path
                 "Virus", #2
                 "P-value",#3
                 "Evidence_Peptide_Ids",#4
-                "XR_Peptides_Ids",
+                "XR_Peptide_Ids",
                 "N-rank #",
                 "Evidence_Peptide_Count",
-                "XR_Peptide",
+                "XR_Peptide_Count",
                 "Filtered_Evidence_Count", #9
                 "Filtered_Evidence_Peptides_Ids",
                 "Filtered_N-rank #",#11

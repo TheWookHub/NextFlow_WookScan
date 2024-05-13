@@ -1,9 +1,11 @@
-#!/usr/bin/env python
+#!/usr/bin/python
+
 
 #==========================="Python library imports"===========================#
 import sys, argparse, os, shlex, psutil, math
 import subprocess as sp
 import viralDB as vDB
+import viralDB_classes as vDBc
 from multiprocessing import cpu_count
 
 #==========================="Global Variables"===========================#
@@ -70,12 +72,12 @@ if __name__ == '__main__':
         parser.print_help()
         sys.exit()
     args=parser.parse_args()
-
-    # check if the input files are valid
+    
+    # check if the input files are valid    
     if(not os.path.isfile(args.genBankFile)):
-        raise vDB.InputError(args.genBankFile,  "Can't find file: ")
+        raise vDBc.InputFileError(args.genBankFile,  "Can't find file: ")
     if(not os.path.isfile(args.vhdb)):
-        raise vDB.InputError(args.vhdb,  "Can't find file: ")    
+        raise vDBc.InputFileError(args.vhdb,  "Can't find file: ")    
     if(args.out):
         if(not os.path.exists(args.out)):
             print(f"{args.out} not found! Creating directory...")
@@ -83,7 +85,7 @@ if __name__ == '__main__':
         WORKDIR = args.out
     if(args.virlib):
         if(not os.path.isfile(args.virlib)):
-            raise vDB.InputError(args.virlib,  "Can't find file: ")
+            raise vDBc.InputFileError(args.virlib,  "Can't find file: ")
         VIRLIB = args.virlib
         NUM_ID = vDB.countFastaSize(VIRLIB)
     if(args.prefix):
@@ -95,7 +97,7 @@ if __name__ == '__main__':
         NUM_CORES = args.processors
     if(args.cluster_cutoff):
         if(args.cluster_cutoff < 0 | args.cluster_cutoff > 100):
-            raise vDB.InputError(args.cluster_cutoff, "Value out of bounds (between 0.0 and 100.0). Given: ")
+            raise vDBc.InputFileError(args.cluster_cutoff, "Value out of bounds (between 0.0 and 100.0). Given: ")
         else:
             CDCLUSTCUTOFF = args.cluster_cutoff
     if(args.cluster_mem):
@@ -142,40 +144,64 @@ if __name__ == '__main__':
     )    
     # reads in viraldb_output.fa (default file name)
     # outputs viraldb_output_90Clust.clstr
-    tool = "cd-hit-est" 
-    params1 = f" -i {outputname + '.fa'}" 
-    params2 = f" -o {outputname +'_Clust'}"
+    tool = "cd-hit-est"
+    params1 = f" -i {outputname}.fa" 
+    params2 = f" -o {outputname}_Clust"
     params3 = f" -c {CDCLUSTCUTOFF} -M {CDMEM} -T {NUM_CORES} -d 0"
     sp.run(shlex.split(tool + params1 + params2 + params3))
     rep_seq_list = vDB.read_cdhit_clust(outputname +'_Clust.clstr')    
     # viraldb_output_rep
-    rep_output = outputname+"_rep"
+    rep_output = f"{outputname}_rep"
+    rep_output_fname = f"{rep_output}.tsv"
     vDB.get_rep_seqs(rep_seq_list,taxon_id_dict,rep_output)
     print(f"")
     print(
-        f"# ------- Step 4: building viral db and tblastn (params set according to AVARDA paper) ------- #\n"
+        f"# ------- Step 4: building viral db, tblastn and blastp (params set according to AVARDA paper) ------- #\n"
     )
     # These args are hardcoded because it is following the settings from AVARDA paper
     # viraldb_output_rep.fa
     
     tool = "makeblastdb" 
-    params = f" -in {rep_output + '.fa'} -parse_seqids -dbtype 'nucl'"
+    params = f" -in {rep_output}.fa -parse_seqids -dbtype 'nucl'"
     print(f"cmd:    {tool + params}")
     sp.run(shlex.split(tool + params))   
     print(f"{tool}: completed\n")
     
     tool = 'tblastn'
-    params1 = f" -query {VIRLIB} -db {rep_output + '.fa'} -out {rep_output + '_tblastn_output'}"
+    tblastn_fname = f"{rep_output}_tblastn_output"
+    params1 = f" -query {VIRLIB} -db {rep_output}.fa -out {rep_output}_tblastn_output"
     params2 = f" -word_size 7 -outfmt 6 -seg no -soft_masking false -max_hsps 1 -max_target_seqs 100000" 
     params3 = f" -num_threads {NUM_CORES}"
     print(f"cmd:    {tool + params1 + params2 + params3}")
     sp.run(shlex.split(tool + params1 + params2 + params3))
     print(f"{tool}: completed\n")
+    
+    # attempt to split the fasta file into how many CPU there are
+    
+    VIRLIB_SPLITS = vDB.createFastaSplits(NUM_CORES,VIRLIB)
+    blastp_fname = vDB.run_blastp(VIRLIB,VIRLIB_SPLITS,NUM_CORES,outputname)
+    # later on for improvement - we can make this into a loop
+    # split the VIRLIB file into N number of allowed cores
+    # and then run in parallel.
+    # Note:     -query would be the not split file and
+    #           -subject would change when parallel runing. One
+    #           for each split.
+
+    # tool = 'blastp'
+    # blastp_fname = f"{outputname}_blastp_output"
+    # params1 = f" -query {VIRLIB} -subject {VIRLIB}"
+    # params2 = f" -out {blastp_fname}"
+    # params3 = f" -outfmt 6 -evalue 100"
+    # print(f"cmd:    {tool + params1 + params2 + params3}")
+    # sp.run(shlex.split(tool + params1 + params2 + params3))
+    # print(f"{tool}: completed\n")
+
     print(
         f"# ------- Step 5: Creating AVARDA support files ------- #\n"
     )
-    vDB.createSupportTables(rep_output + '.tsv', rep_output + '_tblastn_output', NUM_ID, NUM_CORES)
-
+    vDB.createSupportTables(rep_output_fname, tblastn_fname, blastp_fname, NUM_ID, NUM_CORES)
+    # rubbish = VIRLIB_SPLITS
+    # vDB.cleanUp(rubbish)
     print(
         f"# ------- Done! ------- #"
     )

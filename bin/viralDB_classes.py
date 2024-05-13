@@ -108,7 +108,7 @@ class PeptideCompare:
 #========================"My Input File Error Class"=======================#
 
 #Error classes for handling input errors
-class InputFileError:
+class InputFileError(Exception):
     """
         Input File Error class to notify when something is wrong
         with the input files given.    

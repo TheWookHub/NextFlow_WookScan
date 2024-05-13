@@ -8,7 +8,7 @@ import datatable as dt
 import numpy as np
 import subprocess as sp
 import viralDB_classes as vDBClass
-import re,time, shlex
+import re,time,logging, shlex
 
 # ========================= cleanGenBankInfo ========================= #
 # This function checks the genbank format for strange data entries.
@@ -285,9 +285,54 @@ def get_rep_seqs(rep_seq_list,taxon_id_dict,nt_output_prefix):
 # If using WOOKIES_virlib_names_no91273.csv as the VIR library, then the virlib_size
 # is 115752 peptides.
     
-def createSupportTables(taxonMapFile, tblastnOutput, virlib_size, num_cores):    
+def createSupportTables(taxonMapFile, tblastnOutput, blastpOutput, virlib_size, num_cores):    
     tblastn_80plusPath = tblastnOutput + "_bitscore80plus.tsv"
     tblastn_80minusPath = tblastnOutput + "_bitscore80minus.tsv"
+    tblastn_allPath = tblastnOutput + "_bitscoreAll.tsv"
+    
+    # Reading in the blastp results. These should already have eval all less than 100
+    blastpInfo = dt.fread(
+        blastpOutput,
+        columns = slice(0,11)
+    ).to_pandas().rename(
+        columns = {
+            "C0":"qseqid",
+            "C1":"sseqid",
+            "C10":"evalue"        
+        }
+    ).drop(
+        columns = [
+            'C2','C3','C4',
+            'C5','C6','C7',
+            'C8','C9'
+        ]
+    )
+    
+    # remove self pointing edges
+    blastpInfo = blastpInfo[blastpInfo['qseqid'] != blastpInfo['sseqid']]
+    # remove repeated edges (1-2 and 2-1 etc..)
+    blastpInfo['Repeat_ID'] = [
+        '_'.join(sorted(re.split('_',x))) for x in (blastpInfo.qseqid.astype(str) + '_' +  blastpInfo.sseqid.astype(str)).values
+        ]
+    blastpInfo = blastpInfo[~blastpInfo.Repeat_ID.duplicated()]
+    
+    # writing the results to file
+    blastpInfo.loc[
+        :,
+        ['qseqid','sseqid']
+    ].rename(
+        columns = {
+            'qseqid':'combo',
+            'sseqid':'combo.1'
+        }
+    ).to_csv(
+        blastpOutput + "_peptide_edges.csv",
+        index = False,
+        header = True
+    )
+    # We don't need the data structure anymore so remove
+    # to save some mem.
+    del(blastpInfo)
     # read in taxon<->species map file
     taxonMap = dt.fread(
         taxonMapFile
@@ -310,13 +355,14 @@ def createSupportTables(taxonMapFile, tblastnOutput, virlib_size, num_cores):
             "C10":"evalue",
             "C11":"bitscore"
         }
-    )
+    )    
     # filter out bitscore above 80 and merge to get species
     tblastn_80plus = repSeq_tblastn.loc[
         repSeq_tblastn['bitscore']>80
     ].merge(
         taxonMap, on = "sseqid"
     ).drop_duplicates().reset_index(drop = True)
+    
     # filter out bitscore less than/equal to 80 and merge to get species
     # techincally we don't need this file but keeping it for reference
     tblastn_80minus = repSeq_tblastn.loc[
@@ -324,17 +370,31 @@ def createSupportTables(taxonMapFile, tblastnOutput, virlib_size, num_cores):
     ].merge(
         taxonMap, on = "sseqid"
     ).drop_duplicates().reset_index(drop = True)
-    # print(tblastn_80plus)    
+    
+    # take the whole thing
+    tblastn_all = repSeq_tblastn.merge(
+        taxonMap, on = 'sseqid'
+    ).drop_duplicates().reset_index(drop = True)
+
     # write out the files
     tblastn_80plus.to_csv(tblastn_80plusPath, index = False,  header = True,sep = '\t')
-    tblastn_80minus.to_csv(tblastn_80minusPath, index = False, header = True, sep = '\t') 
+    tblastn_80minus.to_csv(tblastn_80minusPath, index = False, header = True, sep = '\t')
+    tblastn_all.to_csv(tblastn_allPath, index = False, header = True, sep = '\t')
     del(tblastn_80minus)   
+    
     # Now we can calculate pident or bitscore table for 80plus only
     print(f"Making pep species tables...\n")
     pident = make_pep_species_table_v2('pident',tblastn_80plus)
     bitscore = make_pep_species_table_v2('bitscore',tblastn_80plus)
     bitscore.to_csv(tblastnOutput + "_bitscore80plus_bitscore.csv", index = True, header= True)
     pident.to_csv(tblastnOutput + "_bitscore80plus_pident.csv", index = True, header= True)
+    
+    # Making the original tblastn without splitting to 80plus/80minus
+    pident = make_pep_species_table_v2('pident',tblastn_all)
+    bitscore = make_pep_species_table_v2('bitscore',tblastn_all)
+    bitscore.to_csv(tblastnOutput + "_bitscoreAll_bitscore.csv", index = True, header= True)
+    pident.to_csv(tblastnOutput + "_bitscoreAll_pident.csv", index = True, header= True)
+
     # Next we calculate unique and total probability table for bitscore80plus
     # here we will use multiprocessing. Make sure num_core is set to
     # <= cpu_count() from multiprocessing.cpu_count
@@ -344,6 +404,7 @@ def createSupportTables(taxonMapFile, tblastnOutput, virlib_size, num_cores):
     virus = tblastn_80plus.Species.drop_duplicates().values
     numVir = len(virus)
     print("Commence multiprocessing to calculate probabilities...\n")
+    
     for i in range(numVir):
         single_result = pool.apply_async(
             singleLoop,
@@ -353,10 +414,10 @@ def createSupportTables(taxonMapFile, tblastnOutput, virlib_size, num_cores):
         time.sleep(1)
     pool.close()
     pool.join()        
-    print("Now the pool is closed and waiting for processes to finish for dev set...\n")
-    # logging.info("Now the pool is closed and waiting for processes to finish for dev set...")
+    print("Now the pool is closed and waiting for processes to finish...\n")
     u_collection = []
     t_collection = []
+    
     for v in multiple_results.keys():
         single_result = multiple_results[v]
         u,t = single_result.get()
@@ -369,10 +430,14 @@ def createSupportTables(taxonMapFile, tblastnOutput, virlib_size, num_cores):
     print(
         f"""
         Output files:
-            *   Unique Probabilties:    {tblastnOutput}_bitscore80plus_unique_probabilities_xr.csv
-            *   Total Probabilities:    {tblastnOutput}_bitscore80plus_total_probabilities.csv
-            *   Pep2Pep (bitscore):     {tblastnOutput}_bitscore80plus_bitscore.csv
-            *   Pep2Pep (pident):       {tblastnOutput}_bitscore80plus_pident.csv
+            *   Unique Probabilties:        {tblastnOutput}_bitscore80plus_unique_probabilities_xr.csv
+            *   Total Probabilities:        {tblastnOutput}_bitscore80plus_total_probabilities.csv
+            *   Pep2Species (bitscore):     {tblastnOutput}_bitscore80plus_bitscore.csv
+            *   Pep2Species (pident):       {tblastnOutput}_bitscore80plus_pident.csv
+            *   Pep2Pep Network:            {blastpOutput}_peptide_edges.csv
+
+            *   Pep2Species (bitscore):     {tblastnOutput}_bitscoreAll_bitscore.csv
+            *   Pep2Species (pident):       {tblastnOutput}_bitscoreAll_pident.csv
         """
     )
     
@@ -389,3 +454,104 @@ def countFastaSize(fastafile):
     output1 = sp.run(shlex.split(cmd1), capture_output=True)
     output2 = sp.run(shlex.split(cmd2), input=output1.stdout, capture_output=True)
     return int(output2.stdout.decode().strip())
+
+# ========================= split viral peptide file ========================= #
+# splits the fasta file to N number of files. By default, splits to how many
+# CPU is available on the comp. This is the parrallelise blastp because
+# for some reason it doesn't multithread if you compare two fasta files.
+
+def createFastaSplits(numSplits,faFile):
+    listA = []
+    listB = []
+    split_Coords = []
+    splitFileList = []
+    with open(faFile) as fHandle:
+        for line in fHandle:        
+            if(line.startswith(">")):            
+                listA.append(int(line.strip().replace('>','')))
+            else:
+                listB.append(line.strip().upper())
+    fa_dt = pd.DataFrame({'id':listA,'ntseq':listB})
+    numSeqs = len(fa_dt)    
+    split = int(numSeqs/numSplits)
+    checkRemaining = numSeqs - (split * numSplits)    
+    for i in range(0,numSplits):
+        if(i == 0):
+            section = (i, split + checkRemaining)         
+        else:
+            lastCoords = list(split_Coords[-1])            
+            section = (lastCoords[-1], ((i+1) * split) + checkRemaining)         
+        split_Coords.append(section)
+    split_id = 0
+    if(faFile.endswith(".fasta")):
+        faFile_prefix = re.split('.fasta', faFile)[0]
+    else:
+        faFile_prefix = re.split('.fa', faFile)[0]
+    for coord in split_Coords:
+        splitName = faFile_prefix + "_" + str(split_id) + ".fa"
+        splitSection = fa_dt.iloc[coord[0]:coord[1],:].reset_index(drop=True)
+        with open(splitName,'w') as splitHandle:
+            for seqNum in range(0,len(splitSection)):
+                splitHandle.write(f">{splitSection.id[seqNum]}\n{splitSection.ntseq[seqNum]}\n")
+        splitFileList.append(splitName)
+        split_id += 1
+    return splitFileList
+
+
+# ========================= single blastp ========================= #
+# runs multiple blastp in parallel so we can do stuff faster. 
+# The program runs single core by default if you compare 2 fasta files.
+# Recommendation on online tutorials are to split the files and run
+# multiple instances of blastp
+
+def run_blastp(virlib,virlib_list, num_cores,outputname):
+    multiple_results = {}    
+    pool = Pool(processes=num_cores)    
+    numFa = len(virlib_list)
+    print("Commence multiprocessing for blastp...\n")    
+    for i in range(numFa):
+        virlib_prefix = re.split('.fa',virlib_list[i])[0]
+        single_result = pool.apply_async(
+            single_blastp,
+            [virlib,virlib_list[i],virlib_prefix]
+        )
+        multiple_results[virlib_prefix] = single_result
+        time.sleep(1)
+    pool.close()
+    pool.join()        
+    print("Now the pool is closed and waiting for processes to finish...\n")
+    blastp_collection = []
+    for v in multiple_results.keys():
+        single_result = multiple_results[v]
+        blastpFile = single_result.get()        
+        blastp_collection.append(blastpFile)
+    blastp_fname = f"{outputname}_blastp_output"
+    tool = 'cat'
+    params1 = ' '.join(blastp_collection)
+    params2 = f'> {blastp_fname}'
+    print(f"Merging blastp outputs to {blastp_fname}...")
+    sp.run(shlex.split(tool + params1 + params2))    
+    return(blastp_fname)
+
+# ========================= single blastp ========================= #
+# a single instance of blastp
+
+def single_blastp(virlib, virlib_split, outputname):
+    tool = 'blastp'    
+    blastp_fname = f"{outputname}_blastp_output"
+    params1 = f" -query {virlib_split} -subject {virlib}"
+    params2 = f" -out {blastp_fname}"
+    params3 = f" -outfmt 6 -evalue 100"
+    print(f"cmd:    {tool + params1 + params2 + params3}")
+    sp.run(shlex.split(tool + params1 + params2 + params3))
+    print(f"{tool} for {blastp_fname}: completed\n")
+    return(blastp_fname)
+
+# ========================= clean up ========================= #
+# remove the split files.
+
+def cleanUp(rubbish_list):
+    print(f"Cleaning up working files...")
+    tool = 'rm'
+    params1 = ' '.join(rubbish_list)
+    sp.run(shlex.split(tool + params1))

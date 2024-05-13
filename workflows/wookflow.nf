@@ -10,6 +10,7 @@
 // include { paramsSummaryMultiqc   } from '../subworkflows/nf-core/utils_nfcore_pipeline'
 // include { softwareVersionsToYAML } from '../subworkflows/nf-core/utils_nfcore_pipeline'
 // include { methodsDescriptionText } from '../subworkflows/local/utils_nfcore_wookflow_pipeline'
+// include { VIRALDB                } from '../subworkflows/local/viraldb/main.nf'
 include { PHIPPERY                } from '../subworkflows/local/phippery/main.nf'
 include { PHIPPERYTOAVARDA        } from '../subworkflows/local/phipperyToAvarda/main.nf'
 include { AVARDA                  } from '../subworkflows/local/AVARDA/main.nf'
@@ -88,6 +89,12 @@ workflow WOOKFLOW {
     // multiqc_report = MULTIQC.out.report.toList() // channel: /path/to/multiqc_report.html
     // versions       = ch_versions                 // channel: [ path(versions.yml) ]
 
+
+    //
+    // RUN: ViralDB - Build Viral Library support files for AVARDA
+    //
+    
+    // TODO
 
     //
     // RUN: PHIPPERY
