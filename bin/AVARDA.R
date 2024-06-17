@@ -278,7 +278,8 @@ AVARDA = function(case_path,thresh,dict_path,total_path,pairwise_path,blast_path
         # returning the length of the nodes and the node id (peptide id)
         # is good
         if(dim(links_filtered)[1]==0){
-            return(c(length(nodes),list(c(""))))
+            # return(c(length(nodes),list(c(""))))
+            return(c(length(nodes),list(nodes)))
         }
     }
 
@@ -566,7 +567,7 @@ AVARDA = function(case_path,thresh,dict_path,total_path,pairwise_path,blast_path
                 "Evidence_Peptide_Count",
                 "XR_Peptide_Count",
                 "Filtered_Evidence_Count", #9
-                "Filtered_Evidence_Peptides_Ids",
+                "Filtered_Evidence_Peptide_Ids",
                 "Filtered_N-rank #",#11
                 "Null_Probability",#12
                 "BH_P-value",#13

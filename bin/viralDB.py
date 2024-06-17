@@ -526,7 +526,7 @@ def run_blastp(virlib,virlib_list, num_cores,outputname):
         blastpFile = single_result.get()        
         blastp_collection.append(blastpFile)
     blastp_fname = f"{outputname}_blastp_output"
-    tool = 'cat'
+    tool = 'cat '
     params1 = ' '.join(blastp_collection)
     params2 = f'> {blastp_fname}'
     print(f"Merging blastp outputs to {blastp_fname}...")
