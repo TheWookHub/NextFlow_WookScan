@@ -14,6 +14,7 @@
 include { PHIPPERY                } from '../subworkflows/local/phippery/main.nf'
 include { PHIPPERYTOAVARDA        } from '../subworkflows/local/phipperyToAvarda/main.nf'
 include { AVARDA                  } from '../subworkflows/local/AVARDA/main.nf'
+include { POSTAVARDA_WORKFLOW     } from '../subworkflows/local/PostAVARDA/main.nf'
 /*
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     RUN MAIN WORKFLOW
@@ -147,7 +148,7 @@ workflow WOOKFLOW {
             virlib      : From PHIPPERYTOAVARDA.out.virlib
             edgeRhits   : From PHIPPERYTOAVARDA.out.edgeRhits
             publishDir  : $params.out_path
-
+            
             """.stripIndent()
             virlib = PHIPPERYTOAVARDA.out.virlib
             edgeRhits = PHIPPERYTOAVARDA.out.edgeRhits
@@ -170,8 +171,9 @@ workflow WOOKFLOW {
             """.stripIndent()
             virlib = Channel.fromPath(params.avarda_names)
             edgeRhits =  Channel.fromPath(params.case_path)
-        }
+        }        
         AVARDA(virlib, edgeRhits)
+        POSTAVARDA_WORKFLOW()
     }
 }
 
