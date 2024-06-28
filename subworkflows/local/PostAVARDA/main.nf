@@ -17,9 +17,7 @@ include { POST_AVARDA_PROCESSING } from '../../../modules/local/postavarda/main.
 sample_table = Channel.fromPath(params.sample_table)
 file_prefix = Channel.value(params.out_name)
 
-workflow POSTAVARDA_WORKFLOW{
-    print("checking file_prefix:")
-    print(file_prefix)
+workflow POSTAVARDA_WORKFLOW{    
     POST_AVARDA_PROCESSING(sample_table,file_prefix)
 }
 
