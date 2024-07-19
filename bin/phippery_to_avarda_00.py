@@ -11,7 +11,9 @@ args = parser.parse_args()
 
 # we load the data here and then take out edgeR hits, also making some pandas dataframe
 phip_result = ph.load(args.i)
+# phip_sample_table = phip_result.sample_table.to_pandas()
 phip_edgeRhits = phip_result.edgeR_hits.to_pandas()
+# phip_edgeRhits = phip_result.edgeR_hits.to_pandas().rename(columns = phip_sample_table.technical_replicate_id)
 
 # here we reset the index so it becomes back to one of the columns
 # we can use this later to merge data when matching IDs.

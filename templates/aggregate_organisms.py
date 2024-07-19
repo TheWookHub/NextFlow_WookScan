@@ -81,7 +81,8 @@ class AggregatePhIP:
             self.edgeR_hits = pd.read_csv(
                 edgeR_hits_fp,
                 index_col=0
-            ).applymap(
+            # ).applymap(
+            ).map(
                 bool
             )
         else:
