@@ -16,7 +16,7 @@ args = parser.parse_args()
 def avardaSampleID_Table(sample_table_file,output_prefix):
     sample_table = pd.read_table(sample_table_file, sep = ',')
     st = sample_table.loc[
-        :,['fastq_filepath']
+        :,['fastq_filepath','technical_replicate_id']
     ].reset_index().rename(
         columns = {'index':'name'}
     )
