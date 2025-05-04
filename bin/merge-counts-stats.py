@@ -10,10 +10,16 @@ from functools import reduce
 from collections import defaultdict
 
 parser = argparse.ArgumentParser()
+
+# sample table
 parser.add_argument("-st", type=str)
+# peptide table
 parser.add_argument("-pt", type=str)
+# count file(s)
 parser.add_argument("-cfp", type=str)
+# stat file(s)
 parser.add_argument("-sfp", type=str)
+# output name
 parser.add_argument("-o", type=str)
 args = parser.parse_args()
 

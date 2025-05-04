@@ -62,6 +62,32 @@ make_phipdata <- function(){
     return(phip_obj)
 }
 
+
+#######################################################################################
+#                                Test Code - START -                                  #
+#######################################################################################
+adjust_background_postEdgeR = function(edgeR_phipObj){
+    sample_status = colData(edgeR_phipObj)
+    counts_info = assays(edgeR_phipObj)$counts
+    hits_info = assays(edgeR_phipObj)$edgeR_hits
+    beadIDs = rownames(
+        sample_status[
+            sample_status$group == 'beads',]
+    )
+    # print(counts_info)
+    adjusted_counts = counts_info - rowMeans(counts_info[,c(beadIDs)])
+    # print(adjusted_counts)
+    adjusted_counts[adjusted_counts < 0 ] = 0
+    # print(adjusted_counts)
+    assay(edgeR_phipObj,"background_adjusted_counts") = adjusted_counts
+    return(edgeR_phipObj) 
+}
+
+#######################################################################################
+#                                 Test Code - END -                                   #
+#######################################################################################
+
+
 # Make the PhIPData object
 print("Building PhIPData object")
 phip_obj <- make_phipdata()
@@ -83,8 +109,19 @@ assay(edgeR_out, "edgeR_hits") <- apply(
     p.adjust(pval, method = "BH") < edgeR_threshold
   })
 
-saveRDS(edgeR_out, "PhIPData.rds")
+#######################################################################################
+#                                Test Code - START -                                  #
+#######################################################################################
 
+edgeR_out2 = adjust_background_postEdgeR(edgeR_out)
+write.csv(assays(edgeR_out2)$background_adjusted_counts, file="edgeR_bg_adjusted_counts.csv")
+
+#######################################################################################
+#                                 Test Code - END -                                   #
+#######################################################################################
+
+saveRDS(edgeR_out, "PhIPData.rds")
+# saveRDS(edgeR_out2, "PhIPData.rds")
 # TODO Do these assay objects save the sample (column) order?
 write.csv(assays(edgeR_out)$edgeR_logpval, file="edgeR_logpval.csv")
 write.csv(assays(edgeR_out)$edgeR_logfc, file="edgeR_logfc.csv")

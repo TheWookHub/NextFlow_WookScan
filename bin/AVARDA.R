@@ -145,7 +145,7 @@ helpMsg = function(input_param){
   message("-------------------------------------------")
 
   missing = setdiff(optList, names(input_param))
-  message(paste("The following required parameters has not defined:",paste(missing, collapse = ', ')))
+  message(paste("The following required parameters was not defined:",paste(missing, collapse = ', ')))
   message("Exit.")
 }
 
