@@ -32,6 +32,7 @@ Contributors:
     - Preston (preston@unsw.edu.au)
     - Bea (b.delgado_corrales@unsw.edu.au)
     - Legana (l.fingerhut@unsw.edu.au)
+    - Shouyu (Coco) Wei (shouyu.wei@student.unsw.edu.au)
 
 """
 
@@ -96,6 +97,17 @@ workflow WOOKFLOW {
     //
     
     // TODO
+
+
+    //
+    // RUN: fastp to clean files
+    //
+    
+    // TODO:
+    // Need to figure out how to connect the fastq files to fastp. 
+    // After fastp, we need to manipulat the sample table information so that
+    // phippery can read the trimmed fastq output from fastp.
+
 
     //
     // RUN: PHIPPERY
