@@ -11,6 +11,7 @@
 // include { softwareVersionsToYAML } from '../subworkflows/nf-core/utils_nfcore_pipeline'
 // include { methodsDescriptionText } from '../subworkflows/local/utils_nfcore_wookflow_pipeline'
 // include { VIRALDB                } from '../subworkflows/local/viraldb/main.nf'
+include { FASTP_WORKFLOW          } from '../subworkflows/local/fastp/main.nf'
 include { PHIPPERY                } from '../subworkflows/local/phippery/main.nf'
 include { PHIPPERYTOAVARDA        } from '../subworkflows/local/phipperyToAvarda/main.nf'
 include { AVARDA                  } from '../subworkflows/local/AVARDA/main.nf'
@@ -106,7 +107,8 @@ workflow WOOKFLOW {
     // TODO:
     // Need to figure out how to connect the fastq files to fastp. 
     // After fastp, we need to manipulat the sample table information so that
-    // phippery can read the trimmed fastq output from fastp.
+    // phippery can read the trimmed fastq output from fastp. Also figure out where
+    // to put this part in the pipeline.
 
 
     //
@@ -139,8 +141,9 @@ workflow WOOKFLOW {
             publishDir      : $params.results
 
         """.stripIndent()
-        PHIPPERY()        
-        PHIPPERYTOAVARDA(PHIPPERY.out)
+        FASTP_WORKFLOW()
+        // PHIPPERY()        
+        // PHIPPERYTOAVARDA(PHIPPERY.out)
     }
 
     if(params.run_AVARDA){        
@@ -184,8 +187,8 @@ workflow WOOKFLOW {
             virlib = Channel.fromPath(params.avarda_names)
             edgeRhits =  Channel.fromPath(params.case_path)
         }        
-        AVARDA(virlib, edgeRhits)
-        POSTAVARDA_WORKFLOW()
+        // AVARDA(virlib, edgeRhits)
+        // POSTAVARDA_WORKFLOW()
     }
 }
 

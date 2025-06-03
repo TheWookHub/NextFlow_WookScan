@@ -37,13 +37,12 @@ if(params.run_phippery){
 
 workflow PHIPPERYTOAVARDA{
     take:
-    data_phip_ch
+        data_phip_ch
 
     main:
-    PHIPOUTPUT(upep_prefix_ch,data_phip_ch)
+        PHIPOUTPUT(upep_prefix_ch,data_phip_ch)
 
     emit:
-    virlib = PHIPOUTPUT.out.virlib
-    edgeRhits = PHIPOUTPUT.out.edgeRhits
-    
+        virlib = PHIPOUTPUT.out.virlib
+        edgeRhits = PHIPOUTPUT.out.edgeRhits    
 }
