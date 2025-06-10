@@ -39,16 +39,21 @@ nextflow.enable.dsl=2
 
 process FASTP_OUT{
     //publishDir "$params.results/pickle_data/", mode: 'copy', overwrite: true
+    //container = 'docker.io/pdawgzgg/avarda_r_env:0.1'
     input:
-        path sample_table
+        tuple val(tech_id),val(basename),val(filename), path(file_path)
     output:
         // path "*trimmed.fastq.gz", emit: fastq_files
-        path "sample_table_head.csv", emit: sample_table_head
+        // path "sample_table_head.csv", emit: sample_table_head
+        path "currWD_${tech_id}.txt", emit: currWD
+        // tuple path("${file_path.basename}_trimmed.fastq.gz")
     script:
         """
-        head $sample_table | cut -f 1 -d , | cut -f 1 -d '.' > sample_table_head.csv
+        echo ${basename[0][1]} > currWD_${tech_id}.txt
         """
 }
+
+// head $sample_table | cut -f 1 -d ',' > sample_table_head.csv
 
 // process MAKE_SAMPLE_INFO{
 //     //publishDir "$params.results/pickle_data/", mode: 'copy', overwrite: true
@@ -73,8 +78,22 @@ workflow FASTP_WORKFLOW{
         // got to extract the first column that contains all
         // the fastq file paths and then run fastp.
         sample_ch = Channel.fromPath(params.sample_table)
-        FASTP_OUT(sample_ch)
-        FASTP_OUT.out.sample_table_head.view()    
+        sample_ch
+            .splitCsv(header:true)
+            .map{ row -> 
+                    tuple(
+                        row.technical_replicate_id, 
+                        row.fastq_filepath =~ /.+\/(.+)\.fastq\.gz/, // extract the base name of the fastq file
+                        row.fastq_filepath, // fastq file path
+                        file("$params.reads_prefix/${row.fastq_filepath}")
+                    ) 
+                }
+            .set { sample_table_ch }
+        
+        // sample_table_ch
+        //     .view(row -> "Sample: ${row[0]} | Path: ${row[1]}\n")
+        FASTP_OUT(sample_table_ch)
+        FASTP_OUT.out.currWD.view()    
 
     // emit:
     //     sample_info = FASTP_OUT.out.sample_info
