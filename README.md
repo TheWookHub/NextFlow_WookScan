@@ -54,6 +54,16 @@ nextflow run ../nf-core-wookflow/main.nf \
 --out_path ../WookScanNextFlowTest2/TestWookFlow2_AVARDA \
 --out_name PHIPAVARDA \
 --avarda_names ../nf-core-wookflow/subworkflows/local/AVARDA/data/avarda_names/avarda_names.csv.gz
+
+# Running Only BIPS #
+
+
+# Running Only Dolphyn #
+
+
+# Running BIPS & Dolphyn#
+
+
 ```
 
 
