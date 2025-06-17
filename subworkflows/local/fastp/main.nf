@@ -36,24 +36,42 @@ nextflow.enable.dsl=2
 
 
 // process FASTP_OUT is to take in the fastq 
-
 process FASTP_OUT{
-    //publishDir "$params.results/pickle_data/", mode: 'copy', overwrite: true
+    publishDir "$params.results/trimmed_fastq/", mode: 'copy', overwrite: true
     //container = 'docker.io/pdawgzgg/avarda_r_env:0.1'
     input:
         tuple val(tech_id),val(basename),val(filename), path(file_path)
     output:
-        // path "*trimmed.fastq.gz", emit: fastq_files
-        // path "sample_table_head.csv", emit: sample_table_head
-        path "currWD_${tech_id}.txt", emit: currWD
-        // tuple path("${file_path.basename}_trimmed.fastq.gz")
+        path("*_trimmed.fastq.gz"), emit: trimmedFqName
+        path("*_trimmed.html")
+        
     script:
+        """        
+        fastp -t 0 \
+        -i "${file_path}" \
+        -z 9 \
+        -o "${basename[0][1]}_trimmed.fastq.gz" \
+        -R "${basename[0][1]}" \
+        -j "${basename[0][1]}_trimmed.json" \
+        -h "${basename[0][1]}_trimmed.html"
         """
-        echo ${basename[0][1]} > currWD_${tech_id}.txt
+}
+// head $sample_table | cut -f 1 -d ',' > sample_table_head.csv
+
+
+// process UPDATE_SAMPLE_TABLE is to update the sample table with the trimmed fastq file names
+process UPDATE_SAMPLE_TABLE{
+    publishDir "$params.results/trimmed_fastq/", mode: 'copy', overwrite: true    
+    input:
+        val trimmed_fastq_list
+    output:
+        path "trimmed_names.txt", emit: trimmed_names
+    script:
+        """        
+        echo ${trimmed_fastq_list} >> trimmed_names.txt
         """
 }
 
-// head $sample_table | cut -f 1 -d ',' > sample_table_head.csv
 
 // process MAKE_SAMPLE_INFO{
 //     //publishDir "$params.results/pickle_data/", mode: 'copy', overwrite: true
@@ -88,13 +106,14 @@ workflow FASTP_WORKFLOW{
                         file("$params.reads_prefix/${row.fastq_filepath}")
                     ) 
                 }
-            .set { sample_table_ch }
+            .set { sample_table_ch }        
         
-        // sample_table_ch
-        //     .view(row -> "Sample: ${row[0]} | Path: ${row[1]}\n")
-        FASTP_OUT(sample_table_ch)
-        FASTP_OUT.out.currWD.view()    
-
+        FASTP_OUT(sample_table_ch) 
+        FASTP_OUT.out.trimmedFqName.set{trimmed_fastq_ch}
+        UPDATE_SAMPLE_TABLE(trimmed_fastq_ch)        
+        // | UPDATE_SAMPLE_TABLE
+        // UPDATE_SAMPLE_TABLE.out.trimmed_fastq.view()
+        
     // emit:
     //     sample_info = FASTP_OUT.out.sample_info
 }

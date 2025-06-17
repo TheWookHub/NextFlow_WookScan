@@ -142,7 +142,7 @@ workflow WOOKFLOW {
 
         """.stripIndent()
         FASTP_WORKFLOW()
-        // PHIPPERY()        
+        // PHIPPERY()
         // PHIPPERYTOAVARDA(PHIPPERY.out)
     }
 
