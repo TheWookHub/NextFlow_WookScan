@@ -43,7 +43,7 @@ process FASTP_OUT{
         tuple val(tech_id),val(basename),val(filename), path(file_path)
     output:
         path("*_trimmed.fastq.gz"), emit: trimmedFqName
-        path("*_trimmed.html")
+        path ("*_trimmed.html")
         
     script:
         """        
@@ -58,17 +58,43 @@ process FASTP_OUT{
 }
 // head $sample_table | cut -f 1 -d ',' > sample_table_head.csv
 
+process UNRAVEL_TRIMMED_NAMES{
+    publishDir "$params.results/trimmed_fastq/", mode: 'copy', overwrite: true
+    input:
+        val trimmed_fastq_list
+    output:
+        path "trimmed_names_collection.txt", emit: trimmed_names_collection
+    script:
+        """        
+        echo "My list is: ${trimmed_fastq_list}"        
+        
+        for item in ${trimmed_fastq_list.join(' ')}; 
+        do            
+            echo "\$item" >> trimmed_names_collection.txt
+        done
+
+        """
+}
+
+// for FILENAME in "${trimmed_fastq_list.join(' ')}";
+//             do
+//                 echo '\\$FILENAME' >> trimmed_names_collection.txt
+//             done;
 
 // process UPDATE_SAMPLE_TABLE is to update the sample table with the trimmed fastq file names
 process UPDATE_SAMPLE_TABLE{
     publishDir "$params.results/trimmed_fastq/", mode: 'copy', overwrite: true    
     input:
-        val trimmed_fastq_list
+        path trimmed_fastq_list
+        path sample_table
     output:
-        path "trimmed_names.txt", emit: trimmed_names
+        path "trimmed_sample_table.csv", emit: trimmed_table
     script:
-        """        
-        echo ${trimmed_fastq_list} >> trimmed_names.txt
+        """
+        update_sample_table.py \
+        -s ${sample_table} \
+        -t ${trimmed_fastq_list} \
+        -o "trimmed_sample_table.csv"
         """
 }
 
@@ -109,8 +135,12 @@ workflow FASTP_WORKFLOW{
             .set { sample_table_ch }        
         
         FASTP_OUT(sample_table_ch) 
-        FASTP_OUT.out.trimmedFqName.set{trimmed_fastq_ch}
-        UPDATE_SAMPLE_TABLE(trimmed_fastq_ch)        
+        
+        UNRAVEL_TRIMMED_NAMES(
+            FASTP_OUT.out.trimmedFqName.toList()
+        )
+        UNRAVEL_TRIMMED_NAMES.out.trimmed_names_collection.set{collection_ch}
+        UPDATE_SAMPLE_TABLE(collection_ch,sample_ch)        
         // | UPDATE_SAMPLE_TABLE
         // UPDATE_SAMPLE_TABLE.out.trimmed_fastq.view()
         
