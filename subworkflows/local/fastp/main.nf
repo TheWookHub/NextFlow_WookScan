@@ -56,7 +56,6 @@ process FASTP_OUT{
         -h "${basename[0][1]}_trimmed.html"
         """
 }
-// head $sample_table | cut -f 1 -d ',' > sample_table_head.csv
 
 process UNRAVEL_TRIMMED_NAMES{
     publishDir "$params.results/trimmed_fastq/", mode: 'copy', overwrite: true
@@ -76,14 +75,9 @@ process UNRAVEL_TRIMMED_NAMES{
         """
 }
 
-// for FILENAME in "${trimmed_fastq_list.join(' ')}";
-//             do
-//                 echo '\\$FILENAME' >> trimmed_names_collection.txt
-//             done;
-
 // process UPDATE_SAMPLE_TABLE is to update the sample table with the trimmed fastq file names
 process UPDATE_SAMPLE_TABLE{
-    publishDir "$params.results/trimmed_fastq/", mode: 'copy', overwrite: true    
+    // publishDir "$params.results/trimmed_fastq/", mode: 'copy', overwrite: true
     input:
         path trimmed_fastq_list
         path sample_table
@@ -97,24 +91,6 @@ process UPDATE_SAMPLE_TABLE{
         -o "trimmed_sample_table.csv"
         """
 }
-
-
-// process MAKE_SAMPLE_INFO{
-//     //publishDir "$params.results/pickle_data/", mode: 'copy', overwrite: true
-//     input:
-//         val upep_string
-//         val phipdata_name
-//     output:
-//         path "*_virlib_names.csv", emit: virlib
-//         path "PhipperyEdgeRHITS_AVARDA_Input.csv", emit: edgeRhits
-//     script:
-//         """
-//         phippery_to_avarda_00.py \
-//         -i $phipdata_name \
-//         -u_pep_id $upep_string
-//         """
-// }
-
 
 workflow FASTP_WORKFLOW{
     main:
@@ -134,30 +110,16 @@ workflow FASTP_WORKFLOW{
                 }
             .set { sample_table_ch }        
         
+        // Run fastp for quality check
+        // NOTE: NO T
         FASTP_OUT(sample_table_ch) 
         
         UNRAVEL_TRIMMED_NAMES(
             FASTP_OUT.out.trimmedFqName.toList()
         )
         UNRAVEL_TRIMMED_NAMES.out.trimmed_names_collection.set{collection_ch}
-        UPDATE_SAMPLE_TABLE(collection_ch,sample_ch)        
-        // | UPDATE_SAMPLE_TABLE
-        // UPDATE_SAMPLE_TABLE.out.trimmed_fastq.view()
-        
-    // emit:
-    //     sample_info = FASTP_OUT.out.sample_info
+        UPDATE_SAMPLE_TABLE(collection_ch,sample_ch)
+    emit:
+        sample_info = UPDATE_SAMPLE_TABLE.out.trimmed_table
 }
 
-
-// workflow PHIPPERYTOAVARDA{
-//     take:
-//     data_phip_ch
-
-//     main:
-//     PHIPOUTPUT(upep_prefix_ch,data_phip_ch)
-
-//     emit:
-//     virlib = PHIPOUTPUT.out.virlib
-//     edgeRhits = PHIPOUTPUT.out.edgeRhits
-    
-// }

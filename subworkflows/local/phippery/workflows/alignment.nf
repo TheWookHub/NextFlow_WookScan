@@ -138,9 +138,11 @@ process replicate_counts {
 }
 
 workflow ALIGN {
-
+    take:
+        checked_sample_table_ch
     main:
-        sample_ch = Channel.fromPath(params.sample_table)
+        // sample_ch = Channel.fromPath(params.sample_table)
+        sample_ch = checked_sample_table_ch
         peptide_ch = Channel.fromPath(params.peptide_table)        
 
         validate_sample_table(sample_ch)

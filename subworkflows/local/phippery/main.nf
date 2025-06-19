@@ -65,8 +65,16 @@ include { DSOUT } from './workflows/output.nf'
 include { AGG } from './workflows/aggregate.nf'
 
 workflow PHIPPERY {
+    // TEST CODE INSERTION
+    take:
+        checked_sample_table_ch
+    // END TEST CODE
     main:
-    ALIGN | STATS | DSOUT | AGG
+    ALIGN(checked_sample_table_ch) | STATS | DSOUT | AGG
+    
+    
+    // original flow
+    // ALIGN | STATS | DSOUT | AGG
 
     emit:
     AGG.out
