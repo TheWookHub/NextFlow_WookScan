@@ -8,87 +8,58 @@
 
 nextflow.enable.dsl=2
 
-/* 
-*   Create:
-*       1)  virlib table 
-*       2)  phippery edgeR avarda input read files
-*/
-//include { PHIPOUTPUT } from '../../../modules/local/phipout/main.nf'
-//include { FASTP_OUT } from '../../../modules/local/phipout/main.nf'
-
-/* 
-*   If needed we generate the new viral database for avarda creating a series
-*   of files. These include:
-*       1)  New network file based on blastp peptide to peptide e-value score < 100. These
-*           will be collected as edges in a csv file. 
-*       2)  Generate bitscore80plus files:
-*           -   total probabilities (species to species probability)
-*           -   unique probabilities (species probability)
-*           -   bitscore80plus bitscore table (peptide id to species bitscore)
-*           -   bitscore80plus pident table (peptide id to species pident) <--- likely not needed but optional
-*
-*   This component requires the user to have downloaded a .gb file from genbank and a .csv (or .tsv) file
-*   from ViralHostDB to feed in to this nexflow component.
-*
-*   Note to self: Need to figure out later how to co-ordinate the options to run this nexflow pipeline.
-*/
-// include { VIRALDB } from '../../../modules/local/phipout/main.nf'
-
-
 // process FASTP_OUT is to take in the fastq 
 process FASTP_OUT{
-    publishDir "$params.results/trimmed_fastq/", mode: 'copy', overwrite: true
+    publishDir "$params.results/filtered_fastq/", mode: 'copy', overwrite: true
     //container = 'docker.io/pdawgzgg/avarda_r_env:0.1'
     input:
         tuple val(tech_id),val(basename),val(filename), path(file_path)
     output:
-        path("*_trimmed.fastq.gz"), emit: trimmedFqName
-        path ("*_trimmed.html")
+        path("*_filtered.fastq.gz"), emit: filteredFqName
+        path ("*_filtered.html")
         
     script:
         """        
         fastp -t 0 \
         -i "${file_path}" \
         -z 9 \
-        -o "${basename[0][1]}_trimmed.fastq.gz" \
+        -o "${basename[0][1]}_filtered.fastq.gz" \
         -R "${basename[0][1]}" \
-        -j "${basename[0][1]}_trimmed.json" \
-        -h "${basename[0][1]}_trimmed.html"
+        -j "${basename[0][1]}_filtered.json" \
+        -h "${basename[0][1]}_filtered.html"
         """
 }
 
-process UNRAVEL_TRIMMED_NAMES{
-    publishDir "$params.results/trimmed_fastq/", mode: 'copy', overwrite: true
+process UNRAVEL_FILTERED_NAMES{
+    publishDir "$params.results/filtered_fastq/", mode: 'copy', overwrite: true
     input:
-        val trimmed_fastq_list
+        val filtered_fastq_list
     output:
-        path "trimmed_names_collection.txt", emit: trimmed_names_collection
+        path "filtered_names_collection.txt", emit: filtered_names_collection
     script:
-        """        
-        echo "My list is: ${trimmed_fastq_list}"        
-        
-        for item in ${trimmed_fastq_list.join(' ')}; 
+        """
+        for item in ${filtered_fastq_list.join(' ')}; 
         do            
-            echo "\$item" >> trimmed_names_collection.txt
+            echo "\$item" >> filtered_names_collection.txt
         done
 
         """
 }
 
-// process UPDATE_SAMPLE_TABLE is to update the sample table with the trimmed fastq file names
+// process UPDATE_SAMPLE_TABLE is to update the sample table with the filtered fastq file names
 process UPDATE_SAMPLE_TABLE{
-    // publishDir "$params.results/trimmed_fastq/", mode: 'copy', overwrite: true
+    // publishDir "$params.results/filtered_fastq/", mode: 'copy', overwrite: true
     input:
-        path trimmed_fastq_list
+        path filtered_fastq_list
         path sample_table
     output:
-        path "trimmed_sample_table.csv", emit: trimmed_table
+        path "filtered_sample_table.csv", emit: filtered_table
     script:
         """
         update_sample_table.py \
         -s ${sample_table} \
-        -t ${trimmed_fastq_list} \
-        -o "trimmed_sample_table.csv"
+        -t ${filtered_fastq_list} \
+        -o "filtered_sample_table.csv"
         """
 }
 
@@ -110,16 +81,14 @@ workflow FASTP_WORKFLOW{
                 }
             .set { sample_table_ch }        
         
-        // Run fastp for quality check
-        // NOTE: NO T
-        FASTP_OUT(sample_table_ch) 
-        
-        UNRAVEL_TRIMMED_NAMES(
-            FASTP_OUT.out.trimmedFqName.toList()
-        )
-        UNRAVEL_TRIMMED_NAMES.out.trimmed_names_collection.set{collection_ch}
+        // Run fastp for quality check and then collect the new filtered fastq
+        // file names. After that alter the original sample table so the fastq file paths
+        // are pointing to the new filtered fastq files.        
+        FASTP_OUT(sample_table_ch)         
+        UNRAVEL_FILTERED_NAMES(FASTP_OUT.out.filteredFqName.toList())
+        UNRAVEL_FILTERED_NAMES.out.filtered_names_collection.set{collection_ch}
         UPDATE_SAMPLE_TABLE(collection_ch,sample_ch)
     emit:
-        sample_info = UPDATE_SAMPLE_TABLE.out.trimmed_table
+        sample_info = UPDATE_SAMPLE_TABLE.out.filtered_table
 }
 

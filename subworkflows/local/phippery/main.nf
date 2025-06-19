@@ -67,10 +67,10 @@ include { AGG } from './workflows/aggregate.nf'
 workflow PHIPPERY {
     // TEST CODE INSERTION
     take:
-        checked_sample_table_ch
+        filtered_sample_table_ch
     // END TEST CODE
     main:
-    ALIGN(checked_sample_table_ch) | STATS | DSOUT | AGG
+    ALIGN(filtered_sample_table_ch) 
     
     
     // original flow
