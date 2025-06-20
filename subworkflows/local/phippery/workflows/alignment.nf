@@ -56,21 +56,6 @@ process generate_index {
     template "generate_index.sh"
 }
 
-
-// process short_read_alignment_copy{
-//     input:
-//     tuple val(sample_id), path(index), path(respective_replicate_path)
-    
-//     output:
-//     stdout
-    
-//     script:
-//     """
-//     echo ${respective_replicate_path}
-//     """
-// }
-
-
 // ALIGN ALL SAMPLES TO THE REFERENCE
 process short_read_alignment {
     label 'alignment_tool'
@@ -149,17 +134,17 @@ workflow ALIGN {
         validate_peptide_table(peptide_ch) \
             | generate_fasta_reference | generate_index
 
-        validate_sample_table.out
+        validate_sample_table.out.view()
             .splitCsv(header:true )
             .map{ row -> 
                 tuple(
                     "peptide_ref",
                     row.sample_id,
-                    file("$params.reads_prefix/$row.fastq_filepath")
+                    // file("$params.reads_prefix/$row.fastq_filepath") # don't need prefix here
+                    file("$row.fastq_filepath") // this is sufficient for filtered
                 ) 
-            }
-            .set { samples_ch }
-                    
+            }.set { samples_ch }
+
         short_read_alignment(
             generate_index.out
                 .cross(samples_ch)

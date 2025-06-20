@@ -64,16 +64,13 @@ include { STATS } from './workflows/statistics.nf'
 include { DSOUT } from './workflows/output.nf'
 include { AGG } from './workflows/aggregate.nf'
 
-workflow PHIPPERY {
-    // TEST CODE INSERTION
+workflow PHIPPERY {    
     take:
-        filtered_sample_table_ch
-    // END TEST CODE
+        filtered_sample_table_ch    
+    
     main:
-    ALIGN(filtered_sample_table_ch) 
-    
-    
-    // original flow
+    ALIGN(filtered_sample_table_ch) | STATS | DSOUT | AGG     
+        // original flow
     // ALIGN | STATS | DSOUT | AGG
 
     emit:
