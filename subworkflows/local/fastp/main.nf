@@ -51,7 +51,7 @@ process UPDATE_SAMPLE_TABLE{
     // publishDir "$params.results/filtered_fastq/", mode: 'copy', overwrite: true
     input:
         path filtered_fastq_list
-        path sample_table
+        path sample_table        
     output:
         path "filtered_sample_table.csv", emit: filtered_table
     script:
@@ -59,6 +59,7 @@ process UPDATE_SAMPLE_TABLE{
         update_sample_table.py \
         -s ${sample_table} \
         -t ${filtered_fastq_list} \
+        -r ${params.results}/filtered_fastq \
         -o "filtered_sample_table.csv"
         """
 }
@@ -87,7 +88,7 @@ workflow FASTP_WORKFLOW{
         FASTP_OUT(sample_table_ch)         
         UNRAVEL_FILTERED_NAMES(FASTP_OUT.out.filteredFqName.toList())
         UNRAVEL_FILTERED_NAMES.out.filtered_names_collection.set{collection_ch}
-        UPDATE_SAMPLE_TABLE(collection_ch,sample_ch)
+        UPDATE_SAMPLE_TABLE(collection_ch,sample_ch)        
     emit:
         sample_info = UPDATE_SAMPLE_TABLE.out.filtered_table
 }
