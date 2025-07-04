@@ -10,7 +10,7 @@ nextflow.enable.dsl=2
 *       1)  virlib table 
 *       2)  phippery edgeR avarda input read files
 */
-include { PHIPOUTPUT } from '../../../modules/local/phipout/main.nf'
+// include { PHIPOUTPUT } from '../../../modules/local/phipout/main.nf'
 
 /* 
 *   If needed we generate the new viral database for avarda creating a series
@@ -30,10 +30,41 @@ include { PHIPOUTPUT } from '../../../modules/local/phipout/main.nf'
 */
 // include { VIRALDB } from '../../../modules/local/phipout/main.nf'
 
+
+process PHIPOUTPUT{
+    publishDir "$params.results/pickle_data/", mode: 'copy', overwrite: true
+    input:
+        val upep_string
+        val phipdata_name
+    output:
+        path "*_virlib_names.csv", emit: virlib
+        path "PhipperyEdgeRHITS_AVARDA_Input.csv", emit: edgeRhits
+    script:
+        """
+        phippery_to_avarda_00.py \
+        -i $phipdata_name \
+        -u_pep_id $upep_string
+        """
+}
+
+process PHIPOUTPUT_EXTRACT{
+    publishDir "$params.results/pickle_data/", mode: 'copy', overwrite: true
+    input:        
+        val phipdata_name
+    output:
+        path "*.csv"
+    script:
+        """
+        simple_phippery_process.py \
+        -d $phipdata_name
+
+        """
+}
+
+
 if(params.run_phippery){
     upep_prefix_ch = Channel.value(params.user_pep_id)
 }
-
 
 workflow PHIPPERYTOAVARDA{
     take:
@@ -41,7 +72,7 @@ workflow PHIPPERYTOAVARDA{
 
     main:
         PHIPOUTPUT(upep_prefix_ch,data_phip_ch)
-
+        PHIPOUTPUT_EXTRACT(data_phip_ch)
     emit:
         virlib = PHIPOUTPUT.out.virlib
         edgeRhits = PHIPOUTPUT.out.edgeRhits    
