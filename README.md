@@ -55,13 +55,53 @@ nextflow run ../nf-core-wookflow/main.nf \
 --out_name PHIPAVARDA \
 --avarda_names ../nf-core-wookflow/subworkflows/local/AVARDA/data/avarda_names/avarda_names.csv.gz
 
-# Running Only BIPS #
+# Mode 1: bips_then_dolphyn (Full Workflow) #
+# This mode takes a directory of protein sequence files, runs BIPS to generate a barcoded library #
+# then uses Dolphyn to generate the predicted epitopes, and pass to BIPS to filter out barcoded library with the predicted epitopes. #
+# The input viral sequence file(s) must be .fa or .csv format #
+nextflow run /home/shouyu/Preston_VirScan_Nextflow/main.nf \
+--mode bips_then_dolphyn \
+-profile docker \
+--input_viral_seqs_dir /path/to/your/virus_directory/ \
+--outdir /path/to/your/result_directory/
+
+# Mode 2: bips_only #
+# This mode runs only the BIPS part to generate a complete barcoded oligo library from the input proteomes. #
+# The input viral sequence file(s) must be .fa or .csv format #
+nextflow run /home/shouyu/Preston_VirScan_Nextflow/main.nf \
+--mode bips_only \
+-profile docker \
+--input_viral_seqs_dir /path/to/your/virus_directory/ \
+--outdir /path/to/your/result_directory/
+
+# Mode 3: dolphyn_standalone #
+# This mode runs Dolphyn as a standalone tool on protein FASTA file to predict epitopes. #
+# The input viral protein sequence file(s) can be .fa single sequences line format or multi sequences lines. dolphyn_standalone can convert multi-line sequences fasta into single line. #
+nextflow run /home/shouyu/Preston_VirScan_Nextflow/main.nf \
+--mode dolphyn_standalone \
+-profile docker  \
+--input_protein_fasta_dir /path/to/your/protein_fa_dir \
+--outdir /path/to/your/result_directory/
 
 
-# Running Only Dolphyn #
+# Mode 4: dolphyn_only (On Pre-computed Oligos) #
+# This mode runs Dolphyn on a set of existing oligonucleotide sequences. #
 
+# Situation A: The input oligos sequence file(s) must be .fa single sequence line format #
+nextflow run /home/shouyu/Preston_VirScan_Nextflow/main.nf \
+--mode dolphyn_only \
+-profile docker \
+--input_oligos_fasta_dir /path/to/your/oligo_fa_dir \
+--outdir /path/to/your/result_directory/
 
-# Running BIPS & Dolphyn#
+# Situation B: The input oligos sequence file(s) must be .csv format #
+nextflow run /home/shouyu/Preston_VirScan_Nextflow/main.nf \
+--mode dolphyn_only \
+-profile docker \
+--input_oligos_csv_dir /path/to/your/oligo_csv_dir \
+--outdir /path/to/your/result_directory/
+
+# The Example input oligos sequence files in .fa and .csv are located in "assets/oligo_csv" and "assets/oligo_fa". #
 
 
 ```
@@ -98,6 +138,8 @@ nf-core/wookflow was originally written by Preston Leung, but the components tha
 
 1) Phippery - ()
 2) AVARDA - ()
+3) BuildPhIPSeqLibrary - ()
+4) Dolphyn - ()
 
 We thank the following people for their extensive assistance in the development of this pipeline:
 

@@ -1,0 +1,606 @@
+#!/usr/bin/env nextflow
+/*
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    nf-core/bipsdolmethodtwo
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    Github : https://github.com/nf-core/bipsdolmethodtwo
+    Website: https://nf-co.re/bipsdolmethodtwo
+    Slack  : https://nfcore.slack.com/channels/bipsdolmethodtwo
+----------------------------------------------------------------------------------------
+*/
+nextflow.enable.dsl=2
+
+// --- Parameters ---
+// params.input_viral_seqs = "/home/shouyu/nf-core-bipsdolmethodtwo/Human_herpesvirus_3.fa" // Or .fasta
+params.mode = "bips_then_dolphyn" // Default mode
+
+params.input_viral_seqs = null    // For bips_then_dolphyn, bips_only, dolphyn_standalone
+params.input_oligos_fasta = null  // For dolphyn_only (if input is pre-cut oligos in FASTA)
+params.input_bips_oligos_csv = null // For dolphyn_only (if input is BIPS oligos_sequence.csv to be converted to FASTA first)
+
+
+params.outdir = "results"
+params.bips_root_dir = "${projectDir}/vendor/BuildPhIPSeqLibrary"
+params.dolphyn_root_dir = "${projectDir}/vendor/Dolphyn"
+// Assuming dolphyn package is vendor/Dolphyn/dolphyn/ and trainingdata is vendor/Dolphyn/dolphyn/trainingdata/
+params.dolphyn_package_path = "${params.dolphyn_root_dir}" // Path to add to PYTHONPATH
+params.dolphyn_training_data_dir = "${params.dolphyn_root_dir}/dolphyn/trainingdata"
+
+params.helper_script = "${projectDir}/bin/workflow_method2.py"
+
+// BIPS output file names (relative to BIPS Data/Output/)
+params.bips_oligos_sequence_csv_name = "oligos_sequence.csv"
+params.bips_barcoded_nuc_file_csv_name = "barcoded_nuc_file.csv"
+// Add other BIPS output files if they are directly needed by other processes
+// params.bips_sequences_ids_csv_name = "sequences_ids.csv"
+
+
+// --- Parameter Validation ---
+// This code will run when the script is first parsed by Nextflow, before workflow execution.
+log.info "Pipeline Mode: ${params.mode}"
+
+if (params.mode == "bips_then_dolphyn" || params.mode == "bips_only" || params.mode == "dolphyn_standalone") {
+    if (!params.input_viral_seqs) {
+        // In DSL2, `error()` is a function that terminates the workflow.
+        error "Parameter `--input_viral_seqs` must be specified for mode '${params.mode}'"
+    }
+    // Check for conflicting inputs if mode is bips_then_dolphyn or bips_only
+    if (params.input_oligos_fasta || params.input_bips_oligos_csv) {
+        log.warn "Parameters `--input_oligos_fasta` and `--input_bips_oligos_csv` are ignored for mode '${params.mode}'."
+    }
+} else if (params.mode == "dolphyn_only") {
+    if (!params.input_oligos_fasta && !params.input_bips_oligos_csv) {
+        error "For mode 'dolphyn_only', either `--input_oligos_fasta` or `--input_bips_oligos_csv` must be specified."
+    }
+    if (params.input_oligos_fasta && params.input_bips_oligos_csv) {
+        error "For mode 'dolphyn_only', please specify only one of `--input_oligos_fasta` or `--input_bips_oligos_csv`, not both."
+    }
+    // Check for conflicting inputs if mode is dolphyn_only
+    if (params.input_viral_seqs) {
+        log.warn "Parameter `--input_viral_seqs` is ignored for mode '${params.mode}'."
+    }
+} else {
+    error "Invalid mode: '${params.mode}'. Valid modes are 'bips_then_dolphyn', 'bips_only', 'dolphyn_only', 'dolphyn_standalone'."
+}
+
+ch_viral_seqs_input = Channel.empty() // Initialize
+
+if (params.mode == "bips_then_dolphyn" || params.mode == "bips_only" || params.mode == "dolphyn_standalone") {
+    log.info "Attempting to create channel for viral sequences."
+    log.info "params.input_viral_seqs value: '${params.input_viral_seqs}'"
+
+    // Check if the parameter is null or empty string before attempting fromPath
+    if (!params.input_viral_seqs || params.input_viral_seqs.trim() == "") {
+        error "--input_viral_seqs parameter is missing or empty for mode '${params.mode}'."
+    }
+
+    // Try to create a file object to see if Groovy can see it
+    def inputFile = file(params.input_viral_seqs) // 'file()' resolves relative to launch dir
+    log.info "Resolved input file path: '${inputFile.toAbsolutePath().toString()}'"
+    // Also good to add .toString() to ensure it's printed as a string cleanly
+    log.info "Does input file exist according to Groovy? ${inputFile.exists()}"
+    log.info "Is it a file? ${inputFile.isFile()}"
+
+    Channel.fromPath(params.input_viral_seqs) // This still uses params.input_viral_seqs directly
+        .ifEmpty { error "Channel.fromPath created an empty channel. Cannot find input viral sequence file: '${params.input_viral_seqs}'. Resolved to '${inputFile.toAbsolutePath().toString()}' which exists: ${inputFile.exists()}" }
+        .map { f -> tuple(f.baseName, f) } // Use 'f' for clarity
+        .set { ch_viral_seqs_input }
+}
+
+// Channel for Dolphyn direct input (FASTA of oligos)
+if (params.mode == "dolphyn_only" && params.input_oligos_fasta) {
+    Channel.fromPath(params.input_oligos_fasta)
+        .ifEmpty { error "Cannot find input oligo FASTA file: ${params.input_oligos_fasta}" }
+        .map { file -> tuple(file.baseName, file) }
+        .set { ch_dolphyn_direct_fasta_input }
+} else {
+    Channel.empty()
+        .set { ch_dolphyn_direct_fasta_input }
+}
+
+// Channel for Dolphyn input that needs conversion from BIPS CSV to FASTA
+if (params.mode == "dolphyn_only" && params.input_bips_oligos_csv) {
+    Channel.fromPath(params.input_bips_oligos_csv)
+        .ifEmpty { error "Cannot find input BIPS oligos CSV file: ${params.input_bips_oligos_csv}" }
+        .map { file -> tuple(file.baseName, file) }
+        .set { ch_dolphyn_bips_csv_input }
+} else {
+    Channel.empty()
+    .set { ch_dolphyn_bips_csv_input }
+}
+
+// --- Workflow ---
+workflow {
+    // == Initialize Core Channels ==
+    // These will be populated based on the pipeline mode.
+    ch_viral_seqs_for_bips = Channel.empty()
+    ch_viral_seqs_for_dolphyn_standalone = Channel.empty()
+    ch_oligos_fasta_for_dolphyn_only = Channel.empty()
+    ch_bips_csv_for_dolphyn_only_conversion = Channel.empty()
+
+
+
+    // --- Prepare Fixed Path Inputs for Processes ---
+    def bips_root_path_obj = file(params.bips_root_dir)
+    if (!bips_root_path_obj.exists() || !bips_root_path_obj.isDirectory()) {
+        error "BIPS root directory specified by params.bips_root_dir not found or not a directory: ${params.bips_root_dir}"
+    }
+
+    def helper_script_path_obj = file(params.helper_script)
+    if (!helper_script_path_obj.exists()) { error "Helper script not found: ${params.helper_script}" }
+
+    // == Populate Initial Input Channels Based on Mode ==
+    if (params.mode == "bips_then_dolphyn" || params.mode == "bips_only") {
+        if (params.input_viral_seqs) {
+            log.info "Mode '${params.mode}': Attempting Channel.fromPath with params.input_viral_seqs: '${params.input_viral_seqs}'"
+            ch_viral_seqs_for_bips = Channel.fromPath(params.input_viral_seqs)
+                // SIMPLIFIED ifEmpty block:
+                .ifEmpty { error "EMPTY CHANNEL: Channel.fromPath (for viral_seqs in mode '${params.mode}') created an empty channel. Input parameter was: '${params.input_viral_seqs}'. Please check if the file exists and the path is correct relative to Nextflow's launch directory." }
+                .map { f -> tuple(f.baseName, f) }
+            log.info "Channel ch_viral_seqs_for_bips potentially created."
+
+        } else {
+            error "--input_viral_seqs is required for mode '${params.mode}'"
+        }
+    }
+
+    if (params.mode == "dolphyn_standalone") {
+        if (params.input_viral_seqs) {
+            log.info "Mode 'dolphyn_standalone': Attempting Channel.fromPath with params.input_viral_seqs: '${params.input_viral_seqs}'"
+            ch_viral_seqs_for_dolphyn_standalone = Channel.fromPath(params.input_viral_seqs)
+                // SIMPLIFIED ifEmpty block:
+                .ifEmpty { error "EMPTY CHANNEL: Channel.fromPath (for dolphyn_standalone) created an empty channel. Input parameter was: '${params.input_viral_seqs}'. Please check file existence and path." }
+                .map { f -> tuple(f.baseName, f) }
+            log.info "Channel ch_viral_seqs_for_dolphyn_standalone potentially created."
+        }
+    }
+
+    if (params.mode == "dolphyn_only") {
+        if (params.input_oligos_fasta) {
+            log.info "Mode 'dolphyn_only': Attempting Channel.fromPath with params.input_oligos_fasta: '${params.input_oligos_fasta}'"
+            ch_oligos_fasta_for_dolphyn_only = Channel.fromPath(params.input_oligos_fasta)
+                                                  .ifEmpty{ error "EMPTY CHANNEL: Channel.fromPath (for oligos_fasta) created an empty channel. Input parameter was: '${params.input_oligos_fasta}'." }
+                                                  .map { f -> tuple(f.baseName, f) }
+            log.info "Channel ch_oligos_fasta_for_dolphyn_only potentially created."
+
+        } else if (params.input_bips_oligos_csv) {
+            log.info "Mode 'dolphyn_only': Attempting Channel.fromPath with params.input_bips_oligos_csv: '${params.input_bips_oligos_csv}'"
+            ch_bips_csv_for_dolphyn_only_conversion = Channel.fromPath(params.input_bips_oligos_csv)
+                                                          .ifEmpty{ error "EMPTY CHANNEL: Channel.fromPath (for bips_csv) created an empty channel. Input parameter was: '${params.input_bips_oligos_csv}'." }
+                                                          .map { f -> tuple(f.baseName, f) }
+            log.info "Channel ch_bips_csv_for_dolphyn_only_conversion potentially created."
+        }
+    }
+
+
+
+    // == Initialize Core Channels ==
+    // These will be populated based on the pipeline mode.
+    ch_bips_oligos_csv_result = Channel.empty()
+    ch_bips_barcoded_csv_result = Channel.empty()
+    ch_fasta_for_core_dolphyn = Channel.empty() // This is for oligo-based Dolphyn prediction
+    ch_dolphyn_json_from_core_prediction = Channel.empty()
+    ch_dolphyn_epitope_csv_result = Channel.empty()
+    ch_selected_bips_oligos_result = Channel.empty()
+    ch_final_filtered_barcodes_result = Channel.empty()
+    ch_dolphyn_standalone_json_result = Channel.empty()
+
+
+    // ========================
+    //      BIPS Execution
+    // ========================
+    if (params.mode == "bips_then_dolphyn" || params.mode == "bips_only") {
+        RUN_BIPS_INITIAL(ch_viral_seqs_for_bips, bips_root_path_obj)
+        ch_bips_oligos_csv_result = RUN_BIPS_INITIAL.out.oligos_csv
+        ch_bips_barcoded_csv_result = RUN_BIPS_INITIAL.out.barcoded_csv
+
+        if (params.mode == "bips_then_dolphyn") {
+            BIPS_CSV_TO_FASTA(ch_bips_oligos_csv_result)
+            ch_fasta_for_core_dolphyn = BIPS_CSV_TO_FASTA.out.oligos_fasta
+        }
+    }
+
+    // ========================
+    //   Dolphyn Standalone Execution (on protein FASTA)
+    // ========================
+    if (params.mode == "dolphyn_standalone") {
+        RUN_DOLPHYN_STANDALONE_PREP(ch_viral_seqs_for_dolphyn_standalone)// dolphyn_training_data_path_obj // if action_run_dolphyn_standalone needs it)
+        ch_dolphyn_standalone_json_result = RUN_DOLPHYN_STANDALONE_PREP.out.dolphyn_json
+    }
+
+        // ========================
+        //   Dolphyn Direct Input Prep
+        // ========================
+    if (params.mode == "dolphyn_only") {
+        if (params.input_oligos_fasta) {
+            ch_fasta_for_core_dolphyn = ch_oligos_fasta_for_dolphyn_only
+        } else if (params.input_bips_oligos_csv) {
+            // Convert user-provided BIPS CSV to FASTA for Dolphyn
+            BIPS_CSV_TO_FASTA(ch_bips_csv_for_dolphyn_only_conversion)
+            ch_fasta_for_core_dolphyn = BIPS_CSV_TO_FASTA.out.oligos_fasta
+        }
+    }
+
+        // ========================
+        //    Dolphyn Execution & Downstream (if applicable)
+        // ========================
+    // Check if ch_fasta_ready_for_dolphyn actually received data
+    // Use .take(1) to ensure it proceeds if there's at least one item,
+    // then filter it back if needed, or use a flag.
+    // A simpler check for "will this branch run":
+    // ch_run_dolphyn_signal = ch_fasta_ready_for_dolphyn
+    //     .count() // Counts items, emits the count
+    //     .map { count -> count > 0 }
+    //boolean run_dolphyn_branch = (params.mode == "bips_then_dolphyn" || params.mode == "dolphyn_only") && !ch_fasta_ready_for_dolphyn.isEmpty().toBlocking().first()
+
+    if (params.mode == "bips_then_dolphyn" || params.mode == "dolphyn_only") {
+        ch_fasta_for_core_dolphyn
+            .ifEmpty { log.info "No oligo FASTA input for core Dolphyn, skipping RUN_DOLPHYN_PREDICTION and subsequent steps." }
+            .set { ch_valid_oligo_fasta_for_dolphyn }
+
+
+        // If ch_fasta_ready_for_dolphyn is empty, RUN_DOLPHYN_PREDICTION won't run.
+        RUN_DOLPHYN_PREDICTION(ch_valid_oligo_fasta_for_dolphyn)
+        ch_dolphyn_json_from_core_prediction  = RUN_DOLPHYN_PREDICTION.out.dolphyn_json
+
+        if (params.mode == "bips_then_dolphyn") {
+            // These will only run if RUN_DOLPHYN_PREDICTION ran (i.e., ch_dolphyn_json_result has data)
+            DOLPHYN_JSON_TO_CSV(ch_dolphyn_json_from_core_prediction)
+            ch_dolphyn_epitope_csv_result = DOLPHYN_JSON_TO_CSV.out.epitope_csv
+
+            // Ensure both channels for join have data
+            ch_bips_oligos_csv_result
+                .join(ch_dolphyn_epitope_csv_result)
+                .set { ch_for_selecting_oligos }
+            SELECT_EPITOPE_POSITIVE_BIPS_OLIGOS(ch_for_selecting_oligos)
+            ch_selected_bips_oligos_result = SELECT_EPITOPE_POSITIVE_BIPS_OLIGOS.out.selected_bips_oligos_csv
+
+            ch_bips_barcoded_csv_result
+                .join(ch_selected_bips_oligos_result)
+                .set { ch_for_filtering_barcodes }
+            FILTER_BIPS_BARCODES(ch_for_filtering_barcodes)
+            ch_final_filtered_barcodes_result = FILTER_BIPS_BARCODES.out.filtered_barcoded_csv
+        }
+    } else if (params.mode == "bips_then_dolphyn" || params.mode == "dolphyn_only") {
+        log.info "No FASTA input for Dolphyn (channel was empty), skipping Dolphyn steps."
+    }
+
+    emit:
+        // BIPS general outputs (from bips_only or bips_then_dolphyn)
+        bips_oligos_sequence_csv = ch_bips_oligos_csv_result
+        bips_barcoded_nuc_csv = ch_bips_barcoded_csv_result
+
+        // Dolphyn general output (JSON from oligo prediction)
+        dolphyn_oligo_prediction_json = ch_dolphyn_json_from_core_prediction
+
+        // Dolphyn standalone output (JSON from direct protein prediction)
+        dolphyn_standalone_prediction_json = ch_dolphyn_standalone_json_result
+
+        // Outputs specific to "bips_then_dolphyn" mode
+        intermediate_epitope_list_csv = ch_dolphyn_epitope_csv_result
+        selected_bips_oligos_for_barcoding = ch_selected_bips_oligos_result
+        final_filtered_barcodes = ch_final_filtered_barcodes_result
+
+}
+
+// --- Processes ---
+
+process RUN_BIPS_INITIAL {
+    tag "$sample_id"
+    // Publish the entire BIPS_run/Data/Output directory for inspection
+    publishDir "${params.outdir}/bips_initial_run_outputs", mode: 'copy', pattern: "BIPS_run/Data/Output/*"
+
+    input:
+    tuple val(sample_id), path(viral_seq_file)
+    path bips_code_dir
+
+    output:
+    // These paths are now relative to the Nextflow work directory after being copied from BIPS_run
+    tuple val(sample_id), path(params.bips_oligos_sequence_csv_name), emit: oligos_csv
+    tuple val(sample_id), path(params.bips_barcoded_nuc_file_csv_name), emit: barcoded_csv
+    // If you need sequences_ids.csv for some reason later:
+    // tuple val(sample_id), path(params.bips_sequences_ids_csv_name), emit: sequences_ids_csv
+
+    script:
+    def bips_staged_name = bips_code_dir.baseName // e.g., "BuildPhIPSeqLibrary"
+    def oligos_out_name = params.bips_oligos_sequence_csv_name
+    def barcoded_out_name = params.bips_barcoded_nuc_file_csv_name
+
+    INPUT_FILENAME="${viral_seq_file.name}"
+    TARGET_BIPS_INPUT_NAME="${viral_seq_file.baseName}.fa"
+
+    """
+    echo "RUN_BIPS_INITIAL for ${sample_id}"
+    echo "Staged BIPS code directory: ${bips_staged_name}"
+
+
+
+    # --- Clean BIPS I/O directories using Shell commands ---
+    BIPS_INPUT_DIR="${bips_staged_name}/Data/Input"
+    BIPS_OUTPUT_DIR="${bips_staged_name}/Data/Output"
+
+    echo "Cleaning \$BIPS_INPUT_DIR (keeping README.md)..."
+    mkdir -p "\$BIPS_INPUT_DIR" # Ensure it exists
+    find "\$BIPS_INPUT_DIR" -mindepth 1 -type f ! -name 'README.md' -delete
+    find "\$BIPS_INPUT_DIR" -mindepth 1 -type d -empty -delete # Remove empty subdirs if any
+
+    echo "Cleaning \$BIPS_OUTPUT_DIR (keeping README.md)..."
+    mkdir -p "\$BIPS_OUTPUT_DIR" # Ensure it exists
+    find "\$BIPS_OUTPUT_DIR" -mindepth 1 -type f ! -name 'README.md' -delete
+    find "\$BIPS_OUTPUT_DIR" -mindepth 1 -type d -empty -delete
+    echo "BIPS I/O directories cleaned."
+    # --- End Cleaning Step ---
+
+
+
+    cp "${viral_seq_file}" "${bips_staged_name}/Data/Input/${TARGET_BIPS_INPUT_NAME}"
+    echo "Copied input to BIPS: ${bips_staged_name}/Data/Input/${TARGET_BIPS_INPUT_NAME}"
+
+    echo "Changing to BIPS directory: ${bips_staged_name}"
+    cd "${bips_staged_name}"
+
+    echo "Current directory: \$(pwd)"
+    echo "Listing Data/Input/:"
+    ls -l Data/Input/
+
+    echo "Executing BIPS: python3 main.py"
+    python3 main.py > bips_stdout.log 2> bips_stderr.log
+    BIPS_EXIT_CODE=\$?
+
+    echo "--- BIPS STDOUT (${sample_id}) ---"
+    cat bips_stdout.log
+    echo "--- BIPS STDERR (${sample_id}) ---"
+    cat bips_stderr.log >&2 # Send to Nextflow stderr
+
+    cd .. # Return to original work directory
+
+    if [ "\$BIPS_EXIT_CODE" -ne 0 ]; then
+        echo "ERROR: BIPS main.py failed with exit code \$BIPS_EXIT_CODE for sample ${sample_id}" >&2
+        exit \$BIPS_EXIT_CODE
+    fi
+
+    # Copy results from BIPS's output dir to the root of the work dir for Nextflow's 'output' declaration
+    if [ -f "${bips_staged_name}/Data/Output/${oligos_out_name}" ]; then
+        cp "${bips_staged_name}/Data/Output/${oligos_out_name}" "./${oligos_out_name}"
+    else
+        echo "ERROR: BIPS output ${oligos_out_name} not found!" >&2
+        exit 1
+    fi
+    if [ -f "${bips_staged_name}/Data/Output/${barcoded_out_name}" ]; then
+        cp "${bips_staged_name}/Data/Output/${barcoded_out_name}" "./${barcoded_out_name}"
+    else
+        echo "ERROR: BIPS output ${barcoded_out_name} not found for sample ${sample_id}!" >&2 
+        exit 1
+    fi
+    """
+}
+
+process BIPS_CSV_TO_FASTA {
+    tag "$sample_id"
+    publishDir "${params.outdir}/dolphyn_prep", mode: 'copy', pattern: "*.fasta"
+
+    input:
+    tuple val(sample_id), path(bips_oligos_csv) // from RUN_BIPS_INITIAL
+
+    output:
+    tuple val(sample_id), path("${sample_id}.oligos_for_dolphyn.fasta"), emit: oligos_fasta
+
+    script:
+    """
+    ${params.helper_script} bips_csv_to_fasta \\
+        --bips_oligos_csv ${bips_oligos_csv} \\
+        --output_fasta ${sample_id}.oligos_for_dolphyn.fasta
+    """
+}
+
+process RUN_DOLPHYN_PREDICTION {
+    conda "bips_environment.yml"
+    
+    tag "$sample_id"
+    publishDir "${params.outdir}/dolphyn_prediction", mode: 'copy', pattern: "*.json"
+
+    input:
+    tuple val(sample_id), path(oligos_fasta) // from BIPS_CSV_TO_FASTA
+
+    output:
+    tuple val(sample_id), path("${sample_id}.dolphyn_raw.json"), emit: dolphyn_json
+
+    script:
+    // params.dolphyn_package_path should be "${projectDir}/vendor/Dolphyn"
+    // This is the directory containing the 'dolphyn' Python package.
+    def dolphyn_path = params.dolphyn_package_path
+
+    // export PYTHONPATH="${params.dolphyn_package_path}:\${PYTHONPATH}"
+
+    """
+    # Safely set or prepend to PYTHONPATH
+    if [ -z "\${PYTHONPATH:-}" ]; then  # Check if PYTHONPATH is unset or empty
+      export PYTHONPATH="${dolphyn_path}"
+    else
+      export PYTHONPATH="${dolphyn_path}:\${PYTHONPATH}"
+    fi
+    echo "PYTHONPATH set to: \$PYTHONPATH" # For debugging
+    
+    ${params.helper_script} run_dolphyn \\
+        --input_fasta ${oligos_fasta} \\
+        --output_json ${sample_id}.dolphyn_raw.json \\
+        --dolphyn_training_data_dir ${params.dolphyn_training_data_dir}
+    """
+}
+
+process DOLPHYN_JSON_TO_CSV {
+    tag "$sample_id"
+    publishDir "${params.outdir}/dolphyn_conversion", mode: 'copy', pattern: "*.csv"
+
+    input:
+    tuple val(sample_id), path(dolphyn_json) // from RUN_DOLPHYN_PREDICTION
+
+    output:
+    tuple val(sample_id), path("${sample_id}.epitopes_from_dolphyn.csv"), emit: epitope_csv
+
+    script:
+    """
+    ${params.helper_script} dolphyn_json_to_csv \\
+        --dolphyn_json ${dolphyn_json} \\
+        --epitope_csv_output ${sample_id}.epitopes_from_dolphyn.csv
+    """
+}
+
+process SELECT_EPITOPE_POSITIVE_BIPS_OLIGOS {
+    tag "$sample_id"
+    publishDir "${params.outdir}/matching_step", mode: 'copy', pattern: "*.csv"
+
+    input:
+    // original_bips_oligos_csv comes from RUN_BIPS_INITIAL
+    // dolphyn_epitopes_csv comes from DOLPHYN_JSON_TO_CSV
+    tuple val(sample_id), path(original_bips_oligos_csv), path(dolphyn_epitopes_csv)
+
+    output:
+    tuple val(sample_id), path("${sample_id}.selected_bips_oligos.csv"), emit: selected_bips_oligos_csv
+
+    script:
+    """
+    ${params.helper_script} select_epitope_positive_bips_oligos \\
+        --original_bips_oligos_csv ${original_bips_oligos_csv} \\
+        --dolphyn_epitopes_csv ${dolphyn_epitopes_csv} \\
+        --selected_bips_oligos_output_csv ${sample_id}.selected_bips_oligos.csv
+    """
+}
+
+process FILTER_BIPS_BARCODES {
+    tag "$sample_id"
+    publishDir "${params.outdir}/final_filtered_barcodes", mode: 'copy', pattern: "*.csv"
+
+    input:
+    // full_bips_barcoded_csv comes from RUN_BIPS_INITIAL
+    // selected_bips_oligos_csv comes from SELECT_EPITOPE_POSITIVE_BIPS_OLIGOS
+    tuple val(sample_id), path(full_bips_barcoded_csv), path(selected_bips_oligos_csv)
+
+    output:
+    tuple val(sample_id), path("${sample_id}.final_epitope_barcoded_oligos.csv"), emit: filtered_barcoded_csv
+
+    script:
+    """
+    ${params.helper_script} filter_bips_barcodes \\
+        --full_barcoded_csv ${full_bips_barcoded_csv} \\
+        --selected_bips_oligos_csv ${selected_bips_oligos_csv} \\
+        --filtered_barcoded_output_csv ${sample_id}.final_epitope_barcoded_oligos.csv
+    """
+}
+
+process RUN_DOLPHYN_STANDALONE_PREP {
+    conda "bips_environment.yml"
+
+
+    tag "$sample_id (Dolphyn Standalone)"
+    publishDir "${params.outdir}/dolphyn_standalone_prediction", mode: 'copy', pattern: "*.json"
+
+    input:
+    tuple val(sample_id), path(protein_fasta_file)
+    // path dolphyn_training_data_dir from file(params.dolphyn_training_data_dir) // If still needed by action
+
+    output:
+    tuple val(sample_id), path("${sample_id}.dolphyn_standalone.json"), emit: dolphyn_json
+
+    script:
+    def dolphyn_path = params.dolphyn_package_path
+
+    """
+    # Safely set or prepend to PYTHONPATH
+    if [ -z "\${PYTHONPATH:-}" ]; then  # Check if PYTHONPATH is unset or empty
+      export PYTHONPATH="${dolphyn_path}"
+    else
+      export PYTHONPATH="${dolphyn_path}:\${PYTHONPATH}"
+    fi
+    echo "PYTHONPATH set to: \$PYTHONPATH" # For debugging
+
+
+    ${params.helper_script} run_dolphyn_standalone \\
+        --input_protein_fasta ${protein_fasta_file} \\
+        --output_json ${sample_id}.dolphyn_standalone.json \\
+        --dolphyn_training_data_dir ${params.dolphyn_training_data_dir} 
+    """
+}
+
+
+
+
+
+/*
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    IMPORT FUNCTIONS / MODULES / SUBWORKFLOWS / WORKFLOWS
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+*/
+/*
+include { BIPSDOLMETHODTWO  } from './workflows/bipsdolmethodtwo'
+include { PIPELINE_INITIALISATION } from './subworkflows/local/utils_nfcore_bipsdolmethodtwo_pipeline'
+include { PIPELINE_COMPLETION     } from './subworkflows/local/utils_nfcore_bipsdolmethodtwo_pipeline'
+*/
+/*
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    NAMED WORKFLOWS FOR PIPELINE
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+*/
+
+//
+// WORKFLOW: Run main analysis pipeline depending on type of input
+//
+/*workflow NFCORE_BIPSDOLMETHODTWO {
+
+    take:
+    samplesheet // channel: samplesheet read in from --input
+
+    main:
+
+    //
+    // WORKFLOW: Run pipeline
+    //
+    BIPSDOLMETHODTWO (
+        samplesheet
+    )
+}*/
+/*
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    RUN MAIN WORKFLOW
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+*/
+
+/*workflow {
+
+    main:
+    //
+    // SUBWORKFLOW: Run initialisation tasks
+    //
+    PIPELINE_INITIALISATION (
+        params.version,
+        params.validate_params,
+        params.monochrome_logs,
+        args,
+        params.outdir,
+        params.input
+    )
+
+    //
+    // WORKFLOW: Run main workflow
+    //
+    NFCORE_BIPSDOLMETHODTWO (
+        PIPELINE_INITIALISATION.out.samplesheet
+    )
+    //
+    // SUBWORKFLOW: Run completion tasks
+    //
+    PIPELINE_COMPLETION (
+        params.email,
+        params.email_on_fail,
+        params.plaintext_email,
+        params.outdir,
+        params.monochrome_logs,
+        params.hook_url,
+    )
+}*/
+
+/*
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    THE END
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+*/

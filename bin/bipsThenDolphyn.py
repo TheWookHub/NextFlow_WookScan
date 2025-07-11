@@ -1,0 +1,503 @@
+#!/usr/bin/env python
+
+from pathlib import Path
+import time
+import shutil
+import pandas as pd
+import os, argparse, sys
+import json, csv
+from collections import OrderedDict
+#sys.path.insert(0, "/home/shouyu/Dolphyn/dolphyn")
+
+# try:
+#     from dolphyn import findEpitopes, saveGlobalEpitopes
+# except ImportError as e:
+#     import sys # Import sys here for the error message
+#     print(f"FATAL: Error importing Dolphyn modules: {e}", file=sys.stderr)
+#     print(f"Please ensure that the parent directory of the 'dolphyn' package (e.g., vendor/Dolphyn/) is correctly added to PYTHONPATH in the Nextflow process.", file=sys.stderr)
+#     print(f"Current sys.path for debugging: {sys.path}", file=sys.stderr)
+#     raise
+
+#from dolphyn import convert_multi_fasta_seq_to_single_line, input_csv_to_fasta, storeOriginProteinInfoFromPredictEpitope
+
+# python3 workflow.py --method 2
+# Set the base path
+base_dir = Path.home()
+bips_dir = base_dir/"prac_BIPS"/"ori_BuildPhIPSeqLibrary_1"/"BuildPhIPSeqLibrary"
+dolphyn_dir = base_dir/"Dolphyn"
+# training_data_dir = dolphyn_dir/"dolphyn"/"trainingdata"
+# feature_file_path = os.path.join(training_data_dir, f"peds_features_{epi_size}mer.csv")
+
+# export PYTHONPATH="/home/shouyu/Dolphyn/dolphyn:$PYTHONPATH"
+    
+# Define each file pathway
+# two_bips_oligos_seq_input_file = base_dir/"prac_BIPS"/"ori_BuildPhIPSeqLibrary_1"/"BuildPhIPSeqLibrary"/"Data"/"Output"/"oligos_sequence.csv"
+# two_bips_oligos_seq_input_fasta_for_dolphyn = base_dir/"Dolphyn"/"oligos_fasta_for_dolphyn.fasta"
+# two_dolphyn_predict_oligos_output_json_file = base_dir/"Dolphyn"/"epi_probas_m02.json"  # method 2 predicted epitope json file
+# dolphyn_predict_oligos_output_csv_file_bips = base_dir/"Dolphyn"/"bips_input_predict_oligos_m02.csv"
+
+
+
+# Integration method 2 function Output - Put this output file as input file into BIPS
+def storeOriginProteinInfoFromPredictEpitope(json_filepath, output_filepath, file_format="csv", seq_field="origi_sequence", deduplication=True):
+    # Read JSON file
+    with open(json_filepath, "r") as f:
+        json_file = json.load(f)
+        
+    protein_seq = OrderedDict() 
+    
+    # Iterate JSON file, extract perotein id + sequence
+    for epitope, info in json_file.items():
+        prot_list = info.get("proteins", [])
+        origin_seqs = info.get(seq_field, [])
+        
+        if not isinstance(origin_seqs, list):
+            origin_seqs = [origin_seqs]
+        # Remove duplicate proteins, keep the first occurrence
+        if len(set(prot_list)) != len(prot_list):
+            # Keep order while removing duplicates
+            seen = set()
+            prot_list_new = []
+            for p in prot_list:
+                if p not in seen:
+                    seen.add(p)
+                    prot_list_new.append(p)
+            prot_list = prot_list_new
+        
+        if len(origin_seqs) == 1 and len(prot_list) > 1:
+        # With only one origin_sequence, it is reused for all proteins
+            origin_seqs = origin_seqs * len(prot_list)
+        else:
+            assert len(prot_list) == len(origin_seqs), f"Mismatch between proteins and origin_sequences for epitope: {epitope}"
+        
+        for prot, seq in zip(prot_list, origin_seqs):
+            # Method 1
+            if deduplication:
+            # If the sequence of the protein has not been recorded and the field is included in info, it is recorded
+                if prot not in protein_seq:
+                    protein_seq[prot] = seq # Only record the protein that appears for the first time and its origin_sequence
+            else:
+                # Method 2
+                if prot not in protein_seq:
+                    protein_seq[prot] = []
+                protein_seq[prot].append(seq)
+    
+    # Write into .csv format
+    if file_format.lower() == "csv":
+        # CSV format：column name must included be sequence_ID, AA_sequence
+        with open(output_filepath, "w", newline="") as csvfile:
+            writer = csv.writer(csvfile)
+            writer.writerow(["sequence_ID", "AA_sequence"])
+            
+            for pid, seqs in protein_seq.items():
+                if deduplication:
+                    writer.writerow([pid, seqs])
+                else:
+                    for seq in seqs:
+                        writer.writerow([pid, seq])
+                    
+    # Write into .fa format
+    elif file_format.lower() == "fa":
+        # .fa format：>sequence_ID\nAA_sequence
+        with open(output_filepath, "w") as fafile:
+            for pid, seqs in protein_seq.items():
+                if deduplication:
+                    fafile.write(f">{pid}\n{seqs}\n")
+                else:
+                    for seq in seqs:
+                        fafile.write(f">{pid}\n{seq}\n")
+    else:
+        raise ValueError("Unsupported file format. Please use 'csv' or 'fa'.")
+    
+    print(f"Converted {json_filepath} to {output_filepath} ({file_format.upper()})")
+
+# Step 1: Read the oligos_sequence.csv generated by BIPS and convert it to FASTA format  
+# Integration Method 2: From BIPS to Dolphyn
+# Input file: BIPS oligos_sequences.csv
+# Output file: bips_input_sample.fa / bips_input_sample.csv
+def action_extract_oligos_to_fasta(oligo_csv_file, output_fasta_file):
+    """
+    Extract oligo_id, oligo_aa_sequence, and origins (taking the first original sequence number) 
+    from oligos_sequence.csv in BIPS, convert to FASTA format, and put into Dolphyn do the epitope prediction.
+    
+    If the oligos_sequence.csv contains terminator, it will be deleted.
+    """
+    import ast
+    
+    df = pd.read_csv(oligo_csv_file)
+    if "oligo_id" not in df.columns or "oligo_aa_sequence" not in df.columns or "origins" not in df.columns:
+        raise ValueError("CSV file missing necessary columns: 'oligo_id', 'oligo_aa_sequence', 'origins'")
+
+    with open(output_fasta_file, "w") as fasta:
+        for _, row in df.iterrows():
+            oligo_id = row["oligo_id"]
+            oligo_seq = row["oligo_aa_sequence"]
+            
+            # If the oligos_sequence.csv contains terminator(*), it will be deleted.
+            oligo_seq = oligo_seq.replace("*", "")
+            
+            # Parse the origins column and take the original protein number in the first element
+            try:
+                origins_list = ast.literal_eval(row["origins"])
+                if isinstance(origins_list, list) and len(origins_list) > 0:
+                    origin_seq_id = origins_list[0][0]
+                else:
+                    origin_seq_id = "unknown_origin"
+            except:
+                origin_seq_id = "unknown_origin"
+
+            # Output the FASTA record, with the ID section separated by | 
+            # from the oligo_id and the original protein sequence number
+            fasta.write(f">{oligo_id}|{origin_seq_id}\n{oligo_seq}\n")
+
+    print(f"Conversion complete! Extracted oligos from {oligo_csv_file} to FASTA: {output_fasta_file}")
+
+# Step 2: Call Dolphyn for epitope prediction
+def action_run_dolphyn_epitope_prediction(fasta_input, json_output, dolphyn_training_data_dir):
+    # Epitope size
+    epitile_size = 15
+    # Prediction threshold  
+    epitope_probability_cutoff = 0.5  
+    
+    from dolphyn import findEpitopes, saveGlobalEpitopes 
+
+    print("Start running Dolphyn for epitope prediction...")
+    
+    training_data_path = "/home/shouyu/Dolphyn/dolphyn/trainingdata"
+    
+    epitopes = findEpitopes(protein_seq_file=fasta_input, epitile_size=epitile_size, testrun = 0, 
+                            epitope_probability_cutoff = epitope_probability_cutoff, base_dir=None)
+    
+    saveGlobalEpitopes(epitopes, json_output)
+    print(f"The Dolphyn prediction is complete and the results have been saved to {json_output}")
+   
+# Step 3: Convert Dolphyn results to BIPS format: .csv or .fa (for method 1 only, method 2 only use csv format)
+# def convert_dolphyn_output_to_bips_fasta(json_input, fasta_output):
+#     storeOriginProteinInfoFromPredictEpitope(json_input, fasta_output, file_format="fa", seq_field="origin_sequences", deduplication=True)
+#     print(f"Dolphyn results are converted and stored as:\n - FASTA: {fasta_output}")
+    
+def action_convert_dolphyn_output_to_bips_csv(json_input, csv_output):
+    storeOriginProteinInfoFromPredictEpitope(json_input, csv_output, file_format="csv", seq_field="origin_sequences", deduplication=False)
+    print(f"Dolphyn results are converted and stored as:\n - CSV: {csv_output}\n")
+
+# New added functions for pipeline
+def action_select_bips_oligos_with_epitopes(
+    original_bips_oligos_csv, # This is BIPS's oligos_sequence.csv
+    dolphyn_epitopes_csv,     # This is the output of action_convert_dolphyn_json_to_epitope_csv
+    selected_bips_oligos_output_csv # Output: A subset of original_bips_oligos_csv
+):
+    # Then match the sequence in the oligos_sequence.py and extract, then put extract sequence into barcoding
+    bips_oligos_df = pd.read_csv(original_bips_oligos_csv)
+    dolphyn_filtered_oligos = pd.read_csv(dolphyn_epitopes_csv)
+    
+    if "oligo_id" not in bips_oligos_df.columns:
+        raise ValueError(f"'oligo_id' column not found in BIPS oligo file: {original_bips_oligos_csv}")
+    if "sequence_ID" not in dolphyn_filtered_oligos.columns:
+        raise ValueError(f"'sequence_ID' column not found in Dolphyn epitopes CSV: {dolphyn_epitopes_csv}")
+    
+    # matched_oligos = bips_oligos[bips_oligos["oligo_id"].isin(dolphyn_filtered_oligos["sequence_ID"])]
+    matched_oligos = bips_oligos_df[bips_oligos_df["oligo_id"].isin(dolphyn_filtered_oligos["sequence_ID"].str.split("|").str[0])]
+    
+    matched_oligos.to_csv(selected_bips_oligos_output_csv, index=False)
+    
+    print(f"Selected BIPS oligos that yielded epitopes. Input BIPS oligos: {original_bips_oligos_csv}, Dolphyn Epitopes: {dolphyn_epitopes_csv}."
+          "Output: {selected_bips_oligos_output_csv}")
+    
+
+def action_match_epitope_barcoded_oligos(full_barcoded_csv, selected_bips_oligos_output_csv, filtered_barcoded_file):
+    """Barcode results of oligos predicted by epitope were matched and Output new barcoded results"""
+    
+    # Read barcoded_nuc_file.csv (entire barcode result generated by BIPS)
+    barcoded_df = pd.read_csv(full_barcoded_csv, header=None)  # Read CSV without column names
+    barcoded_df.columns = ["oligo_id"] + list(barcoded_df.columns[1:])  # Manually specify the first column 'oligo_id'
+
+
+    # Read matched_oligos_from_bips.csv (potential epitope oligos predicted by Dolphyn)
+    matched_oligos_df = pd.read_csv(selected_bips_oligos_output_csv)
+
+    # Only save matching oligos
+    filtered_barcoded_df = barcoded_df[barcoded_df["oligo_id"].isin(matched_oligos_df["oligo_id"])]
+
+    # Generate a new barcoded result file
+    #filtered_barcoded_file = bips_dir / "Data" / "Output" / "predict_epitope_barcoded_nuc_file_m02.csv"
+    filtered_barcoded_df.to_csv(filtered_barcoded_file, index=False, header=["oligo_id", "nuc_sequence", "barcode_0", "barcode_1", "barcode_2", "barcode_3", "barcode_4"])
+
+    print(f"Filtered barcoded file based on selected BIPS oligos. Input barcodes: {full_barcoded_csv}, Selected oligos: {selected_bips_oligos_output_csv}." 
+          "Output: {filtered_barcoded_file}")
+
+def check_fasta_multi_line(fasta_file):
+    """Check whether the FASTA file contains multiple line sequences"""
+    with open(fasta_file, "r") as f:
+        lines = f.readlines()
+    
+    seq_line_count = 0
+    
+    for line in lines:
+        if line.startswith(">"):
+            if seq_line_count > 1:  # Sequence rows that appear more than one
+                return True
+            seq_line_count = 0  
+        else:
+            if line.strip(): 
+                seq_line_count += 1
+    
+    # Check for the last sequence
+    if seq_line_count > 1:
+        return True
+
+    return False
+
+def convert_multi_fasta_seq_to_single_line(input_fasta, output_fasta):
+    with open(input_fasta, "r") as infile, open(output_fasta, "w") as outfile:
+        sequence = ""
+        header = None
+        
+        for line in infile:
+            line = line.strip()
+            # It's a new sequence header
+            if line.startswith(">"): 
+                # If an sequence aleady exists, write it before starting a new one
+                if header:  
+                    outfile.write(f"{sequence}\n")
+                header = line
+                sequence = ""
+                # Write the header
+                outfile.write(header + "\n")  
+            else:
+                # Integrate sequence lines
+                sequence += line  
+        # Write the last sequence
+        if header:  
+            outfile.write(f"{sequence}\n")
+
+def action_run_dolphyn_standalone(
+    input_protein_fasta: str, # Original protein FASTA from user
+    output_json_file: str,    # Where to save the final epi_probas.json
+    dolphyn_training_data_dir
+):
+    """
+    Runs Dolphyn in standalone mode:
+    1. Takes a protein FASTA file.
+    2. Ensures sequences are single-line.
+    3. Runs epitope prediction.
+    4. Saves the JSON output.
+    """
+    print(f"\n=== Running Dolphyn Standalone ===")
+    input_protein_path = Path(input_protein_fasta)
+    output_json_path = Path(output_json_file)
+    current_dir = Path(".") # Intermediates in current work dir
+
+    # Step 1: Prepare input FASTA for Dolphyn (ensure single line)
+    processed_protein_fasta_for_dolphyn = current_dir / (input_protein_path.stem + "_singleline.fa")
+
+    if input_protein_path.suffix.lower() not in [".fasta", ".fa", ".faa"]:
+        raise ValueError(f"Unsupported input file format for Dolphyn standalone: {input_protein_path.suffix}")
+
+    if check_fasta_multi_line(input_protein_path): # Your existing function
+        print(f"Multi-line FASTA detected: {input_protein_path}. Converting to single-line.")
+        convert_multi_fasta_seq_to_single_line(input_protein_path, processed_protein_fasta_for_dolphyn) # Your existing function
+    else:
+        print(f"Input FASTA {input_protein_path} is already single-line or tool handles it. Using directly.")
+        # Copy to ensure we are working with a file in the work directory
+        shutil.copy(input_protein_path, processed_protein_fasta_for_dolphyn)
+
+    # Step 2: Run Dolphyn epitope prediction
+    # Call your existing action_run_dolphyn_epitope_prediction,
+    # but ensure its output is directly to the final output_json_path
+    # OR copy the intermediate json to the final path.
+    # Let's assume action_run_dolphyn_epitope_prediction writes to its output_json argument.
+    action_run_dolphyn_epitope_prediction(
+        str(processed_protein_fasta_for_dolphyn),
+        str(output_json_path), # Dolphyn writes directly to the final desired JSON path
+        args.dolphyn_training_data_dir # Pass this if still needed by the sub-action
+    )
+    print(f"Dolphyn standalone prediction complete. Output: {output_json_path}")
+
+# Used for method 2         
+# def run_bips_until_oligos():
+#     """
+#     Run BIPS only until oligos_sequence.csv is generated.
+#     This function will run BIPS up to the point where oligos_sequence.csv is created,
+#     but it will NOT proceed to barcode the sequences.
+#     """
+#     print("\n=== Running BIPS until oligos_sequence.csv is generated ===\n")
+    
+#     # BIPS main.py pathway
+#     bips_main_script = bips_dir/"main.py"
+
+#     # Run BIPS and generate oligos_sequence.csv
+#     subprocess.run(["python3", bips_main_script])
+
+#     # Check if generate oligos_sequence.csv
+#     oligos_file = bips_dir/"Data"/"Output"/"oligos_sequence.csv"
+#     if os.path.exists(oligos_file):
+#         print(f"Successfully generated: {oligos_file}")
+#     else:
+#         raise FileNotFoundError(f"Failed to generate {oligos_file}. Please check BIPS execution.")
+
+# Used for method 2 
+# def match_epitope_barcoded_oligos():
+#     """Barcode results of oligos predicted by epitope were matched and Output new barcoded results"""
+    
+#     # Read barcoded_nuc_file.csv (entire barcode result generated by BIPS)
+#     barcoded_file = bips_dir / "Data" / "Output" / "barcoded_nuc_file.csv"
+#     barcoded_df = pd.read_csv(barcoded_file, header=None)  # Read CSV without column names
+#     barcoded_df.columns = ["oligo_id"] + list(barcoded_df.columns[1:])  # Manually specify the first column 'oligo_id'
+
+
+#     # Read matched_oligos_from_bips.csv (potential epitope oligos predicted by Dolphyn)
+#     matched_oligos_file = bips_dir / "Data" / "Output" / "matched_oligos_from_bips_m02.csv"
+#     matched_oligos_df = pd.read_csv(matched_oligos_file)
+
+#     # Only save matching oligos
+#     filtered_barcoded_df = barcoded_df[barcoded_df["oligo_id"].isin(matched_oligos_df["oligo_id"])]
+
+#     # Generate a new barcoded result file
+#     filtered_barcoded_file = bips_dir / "Data" / "Output" / "predict_epitope_barcoded_nuc_file_m02.csv"
+#     filtered_barcoded_df.to_csv(filtered_barcoded_file, index=False, header=["oligo_id", "nuc_sequence", "barcode_0", "barcode_1", "barcode_2", "barcode_3", "barcode_4"])
+
+#     print(f"Filtered barcoded file saved as: {filtered_barcoded_file}")
+
+
+# # Run Method 2 (BIPS then Dolphyn)
+# def method2():
+#     print("\n=== Method 2: BIPS first cuts oligos and then passes them to Dolphyn ===\n")
+#     # It is assumed that there is already a virus protein sequences sample in CSV or FASTA format 
+#     run_bips_until_oligos()        
+    
+#     action_extract_oligos_to_fasta(two_bips_oligos_seq_input_file, two_bips_oligos_seq_input_fasta_for_dolphyn)
+#     #run_dolphyn_epitope_prediction(two_bips_oligos_seq_input_fasta_for_dolphyn, two_dolphyn_predict_oligos_output_json_file)
+#     #convert_dolphyn_output_to_bips_csv(two_dolphyn_predict_oligos_output_json_file, dolphyn_predict_oligos_output_csv_file_bips)
+    
+#     # two_bips_oligos_seq_input_file = base_dir/"prac_BIPS"/"ori_BuildPhIPSeqLibrary_1"/"BuildPhIPSeqLibrary"/"Data"/"Output"/"oligos_sequence.csv"
+#     # two_bips_oligos_seq_input_fasta_for_dolphyn = base_dir/"Dolphyn"/"oligos_fasta_for_dolphyn.fasta"
+#     # two_dolphyn_predict_oligos_output_json_file = base_dir/"Dolphyn"/"epi_probas_m02.json"  # method 2 predicted epitope json file
+#     # dolphyn_predict_oligos_output_csv_file_bips = base_dir/"Dolphyn"/"bips_input_predict_oligos_m02.csv"
+
+    
+#     # Then match the sequence in the oligos_sequence.py and extract, then put extract sequence into barcoding
+#     bips_oligos = pd.read_csv(two_bips_oligos_seq_input_file)
+#     dolphyn_filtered_oligos = pd.read_csv(dolphyn_predict_oligos_output_csv_file_bips)
+    
+#     # matched_oligos = bips_oligos[bips_oligos["oligo_id"].isin(dolphyn_filtered_oligos["sequence_ID"])]
+#     matched_oligos = bips_oligos[bips_oligos["oligo_id"].isin(dolphyn_filtered_oligos["sequence_ID"].str.split("|").str[0])]
+    
+#     # Save the matched oligos for further processing in BIPS
+#     matched_oligos_for_bips_file = bips_dir/"Data"/"Output"/"matched_oligos_from_bips_m02.csv"
+#     matched_oligos.to_csv(matched_oligos_for_bips_file, index=False)
+    
+#     # bips_dir = base_dir/"prac_BIPS"/"ori_BuildPhIPSeqLibrary_1"/"BuildPhIPSeqLibrary"
+
+#     print(f"Matching complete! Matched oligos saved to {matched_oligos_for_bips_file}")
+    
+#     match_epitope_barcoded_oligos()
+
+
+if __name__ == "__main__":
+    # New added for pipeline
+    parser = argparse.ArgumentParser(description="BIPS-Dolphyn Method 2 Helper Script.")
+    subparsers = parser.add_subparsers(dest="action", required=True, help="Action to perform")
+
+    # Action: BIPS oligos CSV -> FASTA for Dolphyn
+    p_extract = subparsers.add_parser("bips_csv_to_fasta", help="Convert BIPS oligos_sequence.csv to FASTA for Dolphyn.")
+    p_extract.add_argument("--bips_oligos_csv", required=True, help="Input: BIPS oligos_sequence.csv")
+    p_extract.add_argument("--output_fasta", required=True, help="Output: FASTA file for Dolphyn input.")
+
+    # Action: Dolphyn prediction
+    p_dolphyn = subparsers.add_parser("run_dolphyn", help="Run Dolphyn epitope prediction.")
+    p_dolphyn.add_argument("--input_fasta", required=True, help="Input: FASTA file of oligo sequences.")
+    p_dolphyn.add_argument("--output_json", required=True, help="Output: Dolphyn's raw prediction JSON.")
+    p_dolphyn.add_argument("--dolphyn_training_data_dir", required=True, help="Path to Dolphyn's trainingdata directory.")
+    # p_dolphyn.add_argument("--epitile_size", type=int, default=15)
+    # p_dolphyn.add_argument("--epitope_probability_cutoff", type=float, default=0.5)
+
+    # Action: Dolphyn JSON -> Epitope CSV (sequence_ID, AA_sequence of epitope)
+    p_convert = subparsers.add_parser("dolphyn_json_to_csv", help="Convert Dolphyn JSON to a CSV listing epitopes.")
+    p_convert.add_argument("--dolphyn_json", required=True, help="Input: Dolphyn's raw prediction JSON.")
+    p_convert.add_argument("--epitope_csv_output", required=True, help="Output: CSV file (sequence_ID, AA_sequence of epitope).")
+
+    # Action: Select original BIPS oligos that contained epitopes
+    p_select = subparsers.add_parser("select_epitope_positive_bips_oligos", help="Select original BIPS oligos that yielded epitopes.")
+    p_select.add_argument("--original_bips_oligos_csv", required=True, help="Input: The original oligos_sequence.csv from BIPS.")
+    p_select.add_argument("--dolphyn_epitopes_csv", required=True, help="Input: The CSV of epitopes generated by 'dolphyn_json_to_csv'.")
+    p_select.add_argument("--selected_bips_oligos_output_csv", required=True, help="Output: Filtered oligos_sequence.csv format file.")
+
+    # Action: Filter BIPS barcoded_nuc_file.csv
+    p_filter_bc = subparsers.add_parser("filter_bips_barcodes", help="Filter BIPS barcoded_nuc_file.csv based on selected oligos.")
+    p_filter_bc.add_argument("--full_barcoded_csv", required=True, help="Input: BIPS barcoded_nuc_file.csv.")
+    p_filter_bc.add_argument("--selected_bips_oligos_csv", required=True, help="Input: CSV of selected BIPS oligos (output of 'select_epitope_positive_bips_oligos').")
+    p_filter_bc.add_argument("--filtered_barcoded_output_csv", required=True, help="Output: Final filtered barcoded nuc file.")
+    
+    # NEW Action: Run Dolphyn Standalone (protein FASTA in, JSON out)
+    p_dolphyn_standalone = subparsers.add_parser("run_dolphyn_standalone", help="Run Dolphyn prediction on a protein FASTA file.")
+    p_dolphyn_standalone.add_argument("--input_protein_fasta", required=True, help="Input: Protein FASTA file (.fa, .fasta, .faa).")
+    p_dolphyn_standalone.add_argument("--output_json", required=True, help="Output: Dolphyn's epitope prediction JSON file.")
+    p_dolphyn_standalone.add_argument("--dolphyn_training_data_dir", required=True, help="Path to Dolphyn's trainingdata directory.")
+
+    args = parser.parse_args()
+    start_time = time.time()
+
+    if args.action == "bips_csv_to_fasta":
+        action_extract_oligos_to_fasta(args.bips_oligos_csv, args.output_fasta)
+    elif args.action == "run_dolphyn":
+        action_run_dolphyn_epitope_prediction(args.input_fasta, args.output_json, args.dolphyn_training_data_dir) # args.dolphyn_training_data_dir, args.epitile_size, args.epitope_probability_cutoff
+    elif args.action == "dolphyn_json_to_csv":
+        action_convert_dolphyn_output_to_bips_csv(args.dolphyn_json, args.epitope_csv_output)
+    elif args.action == "select_epitope_positive_bips_oligos":
+        action_select_bips_oligos_with_epitopes(args.original_bips_oligos_csv, args.dolphyn_epitopes_csv, args.selected_bips_oligos_output_csv)
+    elif args.action == "filter_bips_barcodes":
+        action_match_epitope_barcoded_oligos(args.full_barcoded_csv, args.selected_bips_oligos_csv, args.filtered_barcoded_output_csv)
+    elif args.action == "run_dolphyn_standalone":
+        action_run_dolphyn_standalone(
+            args.input_protein_fasta,
+            args.output_json,
+            args.dolphyn_training_data_dir # if needed
+        )
+    else:
+        parser.print_help()
+        sys.exit(1)
+    
+    end_time = time.time()
+    print(f"Helper action '{args.action}' completed in {end_time - start_time:.2f} seconds.")
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    # # Old for pipeline
+    # parser = argparse.ArgumentParser(description="Run Method 2: BIPS → Dolphyn → BIPS")
+    # parser.add_argument("--method", type=int, choices=[1], required=True, help="Runs Method 2.")
+    # parser.add_argument("--input", type=str, required=True, help="Path to input FASTA or CSV sequence file.")
+    # parser.add_argument("--outdir", type=str, required=True, help="Path for the final output directory.")
+    
+    # # BIPS source directory is needed for Data I/O and running main.py
+    # parser.add_argument("--bips-dir", type=str, required=True, help="Path to the staged BIPS source directory (containing the 'Data' subdir and main.py).")
+    # args = parser.parse_args()
+    
+    # print("Starting workflow script...")
+    # start_time = time.time()
+    
+    # try:
+    #     method2(args.input, args.outdir, args.bips_dir)
+    # except Exception as error:
+    #     print(f"\n--- Workflow Script ERROR ---")
+    #     import traceback # Import traceback for detailed error
+    #     print(f"An error occurred during method1 execution: {error}")
+    #     print("Traceback:")
+    #     traceback.print_exc() # Print detailed traceback
+    #     print("--------------------------")
+    #     # Re-raise the exception to ensure Nextflow marks the process as failed
+    #     raise
+    
+    # end_time = time.time()
+    # elapsed = end_time - start_time
+    # print(f"\n Workflow script completed successfully in {elapsed:.2f} seconds.")
+    
+
+   
