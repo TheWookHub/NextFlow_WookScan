@@ -1,0 +1,8 @@
+data/hfc_pubEpitopes.csv
+data/.ipynb_checkpoints/*
+data/SourceData/.ipynb_checkpoints/*
+Manuscript Analyses/.ipynb_checkpoints/*
+dolphyn/trainingdata/.ipynb_checkpoints/*
+dolphyn/.ipynb_checkpoints/*
+dolphyn/__pycache__/
+.ipynb_checkpoints/*
