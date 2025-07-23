@@ -17,7 +17,7 @@ nextflow.enable.dsl = 2
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 */
 
-include { WOOKFLOW                } from './workflows/wookflow_coco'
+include { WOOKFLOW                } from './workflows/wookflow_coco.nf'
 // include { PIPELINE_INITIALISATION } from './subworkflows/local/utils_nfcore_wookflow_pipeline'
 // include { PIPELINE_COMPLETION     } from './subworkflows/local/utils_nfcore_wookflow_pipeline'
 // include { getGenomeAttribute      } from './subworkflows/local/utils_nfcore_wookflow_pipeline'

@@ -25,7 +25,7 @@ workflow BIPS_THEN_DOLPHYN {
         ch_input_for_bips  // ch_viral_seqs_for_bips		// For modes: bips_then_dolphyn, bips_only
         ch_input_for_dolphyn_standalone // ch_viral_seqs_for_dolphyn_standalone		// For mode: dolphyn_standalone
         ch_oligos_fasta_for_dolphyn_only		// For mode: dolphyn_only (oligo FASTA)
-        ch_bips_csv_for_dolphyn_only		// For mode: dolphyn_only (oligo CSV)
+        ch_oligos_csv_for_dolphyn_only		// For mode: dolphyn_only (oligo CSV)
 
 
         //ch_input_files
@@ -37,7 +37,7 @@ workflow BIPS_THEN_DOLPHYN {
     main:
     log.info("${params.mode}")
     log.info("${ch_oligos_fasta_for_dolphyn_only}")
-    log.info("${ch_bips_csv_for_dolphyn_only}")
+    log.info("${ch_oligos_csv_for_dolphyn_only}")
     // == Initialize Core Channels ==
     // These will be populated based on the pipeline mode.
     // ch_viral_seqs_for_bips = Channel.empty()
@@ -144,7 +144,7 @@ workflow BIPS_THEN_DOLPHYN {
             ch_input_for_csv_conversion = Channel.empty()
             ch_input_for_csv_conversion = ch_input_for_csv_conversion.mix(
                                             ch_bips_oligos_csv_result,      // Has data in bips_then_dolphyn mode
-                                            ch_bips_csv_for_dolphyn_only   // Has data in dolphyn_only (with CSV input)
+                                            ch_oligos_csv_for_dolphyn_only   // Has data in dolphyn_only (with CSV input)
                                         )
             // Call the conversion process only ONCE with the merged input channel.
             BIPS_CSV_TO_FASTA(ch_input_for_csv_conversion)
@@ -159,7 +159,7 @@ workflow BIPS_THEN_DOLPHYN {
             // This process call will ONLY be activated if the 'when:' condition inside it is met.
             // We pass the channel containing the user-provided BIPS CSV. If the channel is empty
             // (because the user didn't provide the param), this process won't run.
-            //BIPS_CSV_TO_FASTA(ch_bips_csv_for_dolphyn_only)
+            //BIPS_CSV_TO_FASTA(ch_oligos_csv_for_dolphyn_only)
             def ch_fasta_from_csv_conversion = BIPS_CSV_TO_FASTA.out.oligos_fasta
 
             ch_fasta_for_core_dolphyn = ch_fasta_for_core_dolphyn
@@ -180,18 +180,18 @@ workflow BIPS_THEN_DOLPHYN {
 
 
 			// if (params.mode == "dolphyn_only") {
-            //     //def ch_bips_csv_for_dolphyn_only = 
+            //     //def ch_oligos_csv_for_dolphyn_only = 
 
-            //     //use 'when' here to seperate ch_oligos_fasta_for_dolphyn_only and ch_bips_csv_for_dolphyn_only!
+            //     //use 'when' here to seperate ch_oligos_fasta_for_dolphyn_only and ch_oligos_csv_for_dolphyn_only!
             //     //channel.path = 'assets/dol_test_data/oligos_sequence.csv'
 
             //     if (ch_oligos_fasta_for_dolphyn_only.ifEmpty(false)) {   // Ask
             //             ch_fasta_for_core_dolphyn = ch_oligos_fasta_for_dolphyn_only
             //     }
 
-            //     if (ch_bips_csv_for_dolphyn_only.ifEmpty(false)) {
+            //     if (ch_oligos_csv_for_dolphyn_only.ifEmpty(false)) {
             //         // Convert user-provided BIPS CSV to FASTA for Dolphyn
-            //         BIPS_CSV_TO_FASTA(ch_bips_csv_for_dolphyn_only)
+            //         BIPS_CSV_TO_FASTA(ch_oligos_csv_for_dolphyn_only)
             //         ch_fasta_for_core_dolphyn = BIPS_CSV_TO_FASTA.out.oligos_fasta
             //     } else {
             //         log.info "Error in dolphyn_only."
@@ -200,7 +200,7 @@ workflow BIPS_THEN_DOLPHYN {
 			// }
 
             // Directly connect the BIPS CSV to FASTA conversion process
-            // BIPS_CSV_TO_FASTA(ch_bips_csv_for_dolphyn_only)
+            // BIPS_CSV_TO_FASTA(ch_oligos_csv_for_dolphyn_only)
             // def ch_fasta_from_bips_csv = BIPS_CSV_TO_FASTA.out.oligos_fasta
 
             // // Mix all potential sources for the core Dolphyn input.
@@ -223,13 +223,13 @@ workflow BIPS_THEN_DOLPHYN {
 			//boolean run_dolphyn_branch = (params.mode == "bips_then_dolphyn" || params.mode == "dolphyn_only") && !ch_fasta_ready_for_dolphyn.isEmpty().toBlocking().first()
 
 			if (params.mode == "bips_then_dolphyn" || params.mode == "dolphyn_only") {
-					ch_fasta_for_core_dolphyn
-							.ifEmpty { log.info "No oligo FASTA input for core Dolphyn, skipping RUN_DOLPHYN_PREDICTION and subsequent steps." }
-							.set { ch_valid_oligo_fasta_for_dolphyn }
+					// ch_fasta_for_core_dolphyn
+					// 		.ifEmpty { log.info "No oligo FASTA input for core Dolphyn, skipping RUN_DOLPHYN_PREDICTION and subsequent steps." }
+					// 		.set { ch_valid_oligo_fasta_for_dolphyn }
 
 
 					// If ch_fasta_ready_for_dolphyn is empty, RUN_DOLPHYN_PREDICTION won't run.
-					RUN_DOLPHYN_PREDICTION(ch_valid_oligo_fasta_for_dolphyn)
+					RUN_DOLPHYN_PREDICTION(ch_fasta_for_core_dolphyn)
 					ch_dolphyn_json_from_core_prediction  = RUN_DOLPHYN_PREDICTION.out.dolphyn_json
 
 					if (params.mode == "bips_then_dolphyn") {
@@ -424,7 +424,7 @@ process BIPS_CSV_TO_FASTA {
     publishDir "${params.outdir}/dolphyn_prep", mode: 'copy', pattern: "*.fasta"
 
     when:
-        (params.mode == 'bips_then_dolphyn') || (params.mode == 'dolphyn_only' && params.input_bips_oligos_csv)
+        (params.mode == 'bips_then_dolphyn') || (params.mode == 'dolphyn_only' && params.input_oligos_csv_dir)
         // && params.bips_oligos_sequence_csv_name
 
     input:

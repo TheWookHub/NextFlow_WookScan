@@ -84,19 +84,19 @@ nextflow run /home/shouyu/Preston_VirScan_Nextflow/main.nf \
 --outdir /path/to/your/result_directory/
 
 
-# Mode 4: dolphyn_only (On Pre-computed Oligos) #
+# Mode 4: dolphyn_oligo_only (On Pre-computed Oligos) #
 # This mode runs Dolphyn on a set of existing oligonucleotide sequences. #
 
 # Situation A: The input oligos sequence file(s) must be .fa single sequence line format #
 nextflow run /home/shouyu/Preston_VirScan_Nextflow/main.nf \
---mode dolphyn_only \
+--mode dolphyn_oligo_only \
 -profile docker \
 --input_oligos_fasta_dir /path/to/your/oligo_fa_dir \
 --outdir /path/to/your/result_directory/
 
 # Situation B: The input oligos sequence file(s) must be .csv format #
 nextflow run /home/shouyu/Preston_VirScan_Nextflow/main.nf \
---mode dolphyn_only \
+--mode dolphyn_oligo_only \
 -profile docker \
 --input_oligos_csv_dir /path/to/your/oligo_csv_dir \
 --outdir /path/to/your/result_directory/
