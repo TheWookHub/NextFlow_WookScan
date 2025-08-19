@@ -213,7 +213,8 @@ workflow WOOKFLOW {
                 log.info "Channel ch_oligos_fasta_for_dolphyn_only  created."
 
             } else if (params.input_oligos_csv_dir) {
-                def input_path = params.input_bips_oligos_csv ?: "${params.input_oligos_csv_dir}/*.csv"
+                // def input_path = params.input_bips_oligos_csv ?: "${params.input_oligos_csv_dir}/*.csv"
+                def input_path = "${params.input_oligos_csv_dir}/*.csv"
                 log.info "Mode 'dolphyn_oligo_only': Creating channel from BIPS CSV path/glob: '${input_path}'"
                 ch_oligos_csv_for_dolphyn_only_conversion = Channel.fromPath(input_path)
                                                         .ifEmpty{ error "EMPTY CHANNEL: Channel.fromPath (for bips_csv) created an empty channel. Path/Pattern was: '${input_path}'." }
