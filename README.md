@@ -67,12 +67,13 @@ to move to the branch containing the complete Pre-PhIP-Seq process. After doing 
 
 **Note 2**: If you want to test the success of the Pre-PhIP-Seq pipeline, you can use the built-in test configuration file. This test configuration file is located in **conf/test.config**. This configuration file uses the virus sequence files located in the **assets/bips_test_data, assets/oligo_csv, assets/oligo_fa** directories of the project. 
 
-Open the **conf/test.config file**, since the test of four modes are commented out, you are required to uncomment them before testing each one. Then, run the pipeline test using the command 
+Open the **conf/test.config file**, since the test of four modes are commented out, you are required to uncomment them before testing each one. Then, run the pipeline test using the command  
 ```sh
 nextflow run main.nf -profile test
 ```
 This command provides a standardized and fully reproducible method for each workflow branch.
 
+```
 # Mode 1: bips_then_dolphyn (Full Workflow) #
 # This mode takes a directory of protein sequence files, runs BIPS to generate a barcoded library #
 # then uses Dolphyn to generate the predicted epitopes, and pass to BIPS to filter out barcoded library with the predicted epitopes. #
@@ -120,7 +121,6 @@ nextflow run /home/shouyu/Preston_VirScan_Nextflow/main.nf \
 --outdir /path/to/your/result_directory/
 
 # The Example input oligos sequence files in .fa and .csv are located in "assets/oligo_csv" and "assets/oligo_fa". #
-
 
 ```
 
