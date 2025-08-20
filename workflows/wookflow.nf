@@ -8,7 +8,9 @@ include { FASTP_WORKFLOW          } from '../subworkflows/local/fastp/main.nf'
 include { PHIPPERY                } from '../subworkflows/local/phippery/main.nf'
 include { PHIPPERYTOAVARDA        } from '../subworkflows/local/phipperyToAvarda/main.nf'
 include { AVARDA                  } from '../subworkflows/local/AVARDA/main.nf'
-include { POSTAVARDA_WORKFLOW     } from '../subworkflows/local/PostAVARDA/main.nf'
+
+// may remove this later
+// include { POSTAVARDA_WORKFLOW     } from '../subworkflows/local/PostAVARDA/main.nf'
 /*
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     RUN MAIN WORKFLOW
@@ -126,7 +128,8 @@ workflow WOOKFLOW {
             edgeRhits =  Channel.fromPath(params.case_path)        
         }        
         AVARDA(virlib, edgeRhits)
-        POSTAVARDA_WORKFLOW()
+        // probably don't need this anymore since the sample names are correclty labeled in the AVARDA output
+        // POSTAVARDA_WORKFLOW() 
     }
 
 }
