@@ -39,9 +39,8 @@ Contributors:
 workflow WOOKFLOW {
 
     // take:
-    // ch_samplesheet // channel: samplesheet read in from --input
-
-
+    // ch_samplesheet 
+    // channel: samplesheet read in from --input
     log.info "[WORKFLOW] Starting main workflow..."
     log.info "[WORKFLOW] BIPS/Dolphyn mode: ${params.mode ?: 'not set'}"
     log.info "[WORKFLOW] Run Phippery flag: ${params.run_phippery}"
@@ -59,7 +58,6 @@ workflow WOOKFLOW {
         ch_oligos_fasta_for_dolphyn_only = Channel.empty()
         ch_oligos_csv_for_dolphyn_only_conversion = Channel.empty()
 
-
         // --- Prepare Fixed Path Inputs for Processes ---
         def bips_root_path_obj = file(params.bips_root_dir)
         if (!bips_root_path_obj.exists() || !bips_root_path_obj.isDirectory()) {
@@ -69,32 +67,31 @@ workflow WOOKFLOW {
         def helper_script_path_obj = file(params.helper_script)
         if (!helper_script_path_obj.exists()) { error "Helper script not found: ${params.helper_script}" }
 
-
         // == Populate Initial Input Channels Based on Mode ==
         if (params.mode == "bips_then_dolphyn" || params.mode == "bips_only") {
             log.info """
-            --------------------------------------
-            WookScan uses: BuildPhIPSeqLibrary!
-            --------------------------------------
-            
-            BuildPhIPSeqLibrary is developed by:
-            kalkairis Iris Kalka, sigallev
-            Repository: https://github.com/kalkairis/BuildPhIPSeqLibrary.git            
-            ================================
-            Input directory  : BuildPhIPSeqLibrary/Input
-            Output directory : BuildPhIPSeqLibrary/Output
-            
-            --------------------------------------
-            WookScan Custom Scripts: bipsThenDolphyn
-            --------------------------------------
-            BIPS output to Dolphyn is developed by:
-            Shouyu Wei
-            ================================
-            mode             : $params.mode
-            input directory  : $params.input_viral_seqs_dir
-            Output directory : $params.outdir
+                --------------------------------------
+                WookScan uses: BuildPhIPSeqLibrary!
+                --------------------------------------
+                
+                BuildPhIPSeqLibrary is developed by:
+                kalkairis Iris Kalka, sigallev
+                Repository: https://github.com/kalkairis/BuildPhIPSeqLibrary.git            
+                ================================
+                Input directory  : BuildPhIPSeqLibrary/Input
+                Output directory : BuildPhIPSeqLibrary/Output
+                
+                --------------------------------------
+                WookScan Custom Scripts: bipsThenDolphyn
+                --------------------------------------
+                BIPS output to Dolphyn is developed by:
+                Shouyu Wei
+                ================================
+                mode             : $params.mode
+                input directory  : $params.input_viral_seqs_dir
+                Output directory : $params.outdir
 
-        """.stripIndent()
+            """.stripIndent()
 
             if (params.input_viral_seqs_dir) {
                 log.info "Mode '${params.mode}': Creating BATCH channel from directory: '${params.input_viral_seqs_dir}'"
@@ -117,34 +114,33 @@ workflow WOOKFLOW {
             }
         }
 
-
         if (params.mode == "dolphyn_standalone") {
             log.info """
-            --------------------------------------
-            WookScan uses: Dolphyn!
-            --------------------------------------
-            
-            Dolphyn is developed by:
-            Liebhoff, AM. et al
-            Repository: https://github.com/kepsi/Dolphyn.git            
-            ================================
-            Input file  : viral protein sequence file in .fa single line format
-            Output file : the predicted epitopes in .json file
-            
-            --------------------------------------
-            WookScan Custom Scripts: bipsThenDolphyn
-            --------------------------------------
-            The source code of Dolphyn is modified by:
-            Shouyu Wei
-            
-            Modified code includes:
-            initEpiPredictor(), getPEDSTrainingSet(), kmer_features_of_protein(), findEpitopes(), saveGlobalEpitopes()
-            ================================
-            mode             : $params.mode
-            input directory  : $params.input_protein_fasta_dir
-            Output directory : $params.outdir
+                --------------------------------------
+                WookScan uses: Dolphyn!
+                --------------------------------------
+                
+                Dolphyn is developed by:
+                Liebhoff, AM. et al
+                Repository: https://github.com/kepsi/Dolphyn.git            
+                ================================
+                Input file  : viral protein sequence file in .fa single line format
+                Output file : the predicted epitopes in .json file
+                
+                --------------------------------------
+                WookScan Custom Scripts: bipsThenDolphyn
+                --------------------------------------
+                The source code of Dolphyn is modified by:
+                Shouyu Wei
+                
+                Modified code includes:
+                initEpiPredictor(), getPEDSTrainingSet(), kmer_features_of_protein(), findEpitopes(), saveGlobalEpitopes()
+                ================================
+                mode             : $params.mode
+                input directory  : $params.input_protein_fasta_dir
+                Output directory : $params.outdir
 
-        """.stripIndent()
+            """.stripIndent()
 
             if (!params.input_protein_fasta_dir) {
                 error "Parameter `--input_protein_fasta_dir` (a directory path) must be specified for mode 'dolphyn_standalone'"
@@ -164,32 +160,31 @@ workflow WOOKFLOW {
 
         if (params.mode == "dolphyn_oligo_only") {
             log.info """
-            --------------------------------------
-            WookScan uses: Dolphyn!
-            --------------------------------------
-            
-            Dolphyn is developed by:
-            Liebhoff, AM. et al
-            Repository: https://github.com/kepsi/Dolphyn.git            
-            ================================
-            Input file  : oligo sequence file in .fa or .csv single line format
-            Output file : the predicted epitopes in .json file
-            
-            --------------------------------------
-            WookScan Custom Scripts: bipsThenDolphyn
-            --------------------------------------
-            The source code of Dolphyn is modified by:
-            Shouyu Wei
-            
-            Modified code includes:
-            initEpiPredictor(), getPEDSTrainingSet(), kmer_features_of_protein(), findEpitopes(), saveGlobalEpitopes()
-            ================================
-            mode             : $params.mode
-            input directory  : $params.input_oligos_fasta_dir OR $params.input_oligos_csv_dir
-            Output directory : $params.outdir
+                --------------------------------------
+                WookScan uses: Dolphyn!
+                --------------------------------------
+                
+                Dolphyn is developed by:
+                Liebhoff, AM. et al
+                Repository: https://github.com/kepsi/Dolphyn.git            
+                ================================
+                Input file  : oligo sequence file in .fa or .csv single line format
+                Output file : the predicted epitopes in .json file
+                
+                --------------------------------------
+                WookScan Custom Scripts: bipsThenDolphyn
+                --------------------------------------
+                The source code of Dolphyn is modified by:
+                Shouyu Wei
+                
+                Modified code includes:
+                initEpiPredictor(), getPEDSTrainingSet(), kmer_features_of_protein(), findEpitopes(), saveGlobalEpitopes()
+                ================================
+                mode             : $params.mode
+                input directory  : $params.input_oligos_fasta_dir OR $params.input_oligos_csv_dir
+                Output directory : $params.outdir
 
-        """.stripIndent()
-        
+            """.stripIndent()        
             // Check that only one of the two possible directory inputs is provided
             if (params.input_oligos_fasta_dir && params.input_oligos_csv_dir) {
                 error "For 'dolphyn_oligo_only' mode, please specify only ONE of --input_oligos_fasta_dir or --input_oligos_csv_dir."
@@ -197,9 +192,6 @@ workflow WOOKFLOW {
             if (!params.input_oligos_fasta_dir && !params.input_oligos_csv_dir) {
                 error "For 'dolphyn_oligo_only' mode, either --input_oligos_fasta_dir or --input_oligos_csv_dir must be specified."
             }
-            
-
-
             if (params.input_oligos_fasta_dir) {
                 def input_path = "${params.input_oligos_fasta_dir}/*.fa"
                 log.info "Mode 'dolphyn_oligo_only': Creating channel from oligo FASTA path/glob: '${input_path}'"
@@ -208,7 +200,6 @@ workflow WOOKFLOW {
                                                     .ifEmpty{ error "EMPTY CHANNEL: Channel.fromPath (for oligos_fasta) created an empty channel. Path/Pattern was: '${input_path}'." }
                                                     .map { f -> tuple(f.baseName, f) }
                 log.info "Channel ch_oligos_fasta_for_dolphyn_only  created."
-
             } else if (params.input_oligos_csv_dir) {
                 // def input_path = params.input_bips_oligos_csv ?: "${params.input_oligos_csv_dir}/*.csv"
                 def input_path = "${params.input_oligos_csv_dir}/*.csv"
@@ -232,7 +223,6 @@ workflow WOOKFLOW {
                 bips_root_path_obj,
                 helper_script_path_obj
             )
-
         }
     }
     
