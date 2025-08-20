@@ -281,7 +281,7 @@ process BIPS_CSV_TO_FASTA {
 }
 
 process RUN_DOLPHYN_PREDICTION {
-    conda "bips_environment.yml"
+    conda "$baseDir/bips_environment.yml"
     
     tag "$sample_id"
     publishDir "${params.outdir}/dolphyn_prediction", mode: 'copy', pattern: "*.json"
@@ -376,7 +376,7 @@ process FILTER_BIPS_BARCODES {
 }
 
 process RUN_DOLPHYN_STANDALONE_PREP {
-    conda "bips_environment.yml"
+    conda "$baseDir/bips_environment.yml"
 
 
     tag "$sample_id (Dolphyn Standalone)"

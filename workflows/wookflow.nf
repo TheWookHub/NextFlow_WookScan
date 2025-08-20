@@ -11,10 +11,10 @@
 // include { softwareVersionsToYAML } from '../subworkflows/nf-core/utils_nfcore_pipeline'
 // include { methodsDescriptionText } from '../subworkflows/local/utils_nfcore_wookflow_pipeline'
 // include { VIRALDB                } from '../subworkflows/local/viraldb/main.nf'
-// include { PHIPPERY                } from '../subworkflows/local/phippery/main.nf'
-// include { PHIPPERYTOAVARDA        } from '../subworkflows/local/phipperyToAvarda/main.nf'
-// include { AVARDA                  } from '../subworkflows/local/AVARDA/main.nf'
-// include { POSTAVARDA_WORKFLOW     } from '../subworkflows/local/PostAVARDA/main.nf'
+include { PHIPPERY                } from '../subworkflows/local/phippery/main.nf'
+include { PHIPPERYTOAVARDA        } from '../subworkflows/local/phipperyToAvarda/main.nf'
+include { AVARDA                  } from '../subworkflows/local/AVARDA/main.nf'
+include { POSTAVARDA_WORKFLOW     } from '../subworkflows/local/PostAVARDA/main.nf'
 
 include { BIPS_THEN_DOLPHYN     } from '../subworkflows/local/bipsThenDolphyn/main.nf'
 /*
