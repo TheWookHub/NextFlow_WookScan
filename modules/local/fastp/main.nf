@@ -1,7 +1,9 @@
-// Migrated process to upper level to
-// PHIPPERYTOAVARDA at '../subworkflows/local/phipperyToAvarda/main.nf'
+// process FASTP_OUT is to take in the fastq 
 
-// process PHIPOUTPUT{
+// probably don't need this script as I've already put it as a process
+// in the fastp workflow.
+
+// process FASTP_OUT{
 //     publishDir "$params.results/pickle_data/", mode: 'copy', overwrite: true
 //     input:
 //         val upep_string

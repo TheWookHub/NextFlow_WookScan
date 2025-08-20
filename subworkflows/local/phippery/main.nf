@@ -64,9 +64,14 @@ include { STATS } from './workflows/statistics.nf'
 include { DSOUT } from './workflows/output.nf'
 include { AGG } from './workflows/aggregate.nf'
 
-workflow PHIPPERY {
+workflow PHIPPERY {    
+    take:
+        filtered_sample_table_ch    
+    
     main:
-    ALIGN | STATS | DSOUT | AGG
+    ALIGN(filtered_sample_table_ch) | STATS | DSOUT | AGG     
+        // original flow
+    // ALIGN | STATS | DSOUT | AGG
 
     emit:
     AGG.out
