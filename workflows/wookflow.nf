@@ -226,20 +226,13 @@ workflow WOOKFLOW {
         }
     }
     
-
-
-
     // ========================================================================================
     //      POST-PHIP-SEQ: PHIPPERY/AVARDA MODULE LOGIC
     // ========================================================================================
 
-    // ch_versions = Channel.empty()
-    // ch_multiqc_files = Channel.empty()
-
     //
     // RUN: ViralDB - Build Viral Library support files for AVARDA        
     // TODO   
-
     
     // Print out the message for running phippert    
     if(params.run_phippery){        
@@ -310,10 +303,16 @@ workflow WOOKFLOW {
             
         }
     }
-    // Running Fastp -> Phippery
+    
     if(params.run_phippery){
-        FASTP_WORKFLOW()
-        PHIPPERY(FASTP_WORKFLOW.out)
+        // Running Fastp -> Phippery
+        if(params.run_fastp){            
+            FASTP_WORKFLOW()
+            PHIPPERY(FASTP_WORKFLOW.out)
+        // Omits Fastp. Assumes fastqs are already trimmed / filtered 
+        }else{            
+            PHIPPERY(Channel.fromPath(params.sample_table))
+        }
         // PHIPPERY()        
         PHIPPERYTOAVARDA(PHIPPERY.out)
     }

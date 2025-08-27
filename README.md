@@ -1,77 +1,40 @@
 # Nextflow for VirScan Pipeline
 
 **Contributors**
- - Preston
- - Bea
- - Legana
+ - Preston Leung
+ - Bea Delgado-Corrales
+ - Legana Fingerhut
  - Shouyu (Coco) Wei 
+
+
+## Introduction
+
+**nf-core/wookflow** is a bioinformatics pipeline that integrates several tools into one. The pipeline can be broken down into two components. Pre-PhIPSeq oligonucleotide library generation and Post-PhIPSeq sequence analysis. Briefly, PhIPSeq (Phage Immunoprecipitate Sequencing) is a technique that makes use of phages to display peptides on the surface such that antibodies can bind onto. This is followed by separating phages bound by antibodies to those that aren't through the use of magnetic beads. Non-bound beads are then washed away with the remaining bound phages progress to sequencing. For Pre-PhIPSeq BIPS and Dolphyn have been integrated to support custom oligonucleotide library support while phippery supports Post-PhIPSeq data analysis. AVARDA (also Post-PhIPSeq) is a VirScan (defined Human virome oligonucleotide library) Library specific tool that helps to identify individual species of viruses when cross-reactivity exists.
+
+Pre-PhIPSeq library generation aims to provide an integrated approach to go from protein sequences direcctly to oligonucleotide library such that it can be synthesised and be ready for PhIPSeq experiments. Post-PhIPSeq analysis aims to allow a smooth flow from fastq files to read counts data that are ready for down stream analyses. While phippery outputs counts data together with edgeR hits to identify peptides that were significantly occurring above background noise, AVARDA will take the hits data to determine which species have been observed based on the peptide hits. AVARDA also accounts for the potential similarity between peptides that come from organisms with high similarity in their genetics. This in turn allows the determination of whether a species can be uniquely identified as due to existence of peptides that were exclusively from that species.
+
+
+![Test Image]()
+(https://github.com/TheWookHub/Preston_VirScan_Nextflow/blob/main_mod/readme_figures/WookFlow_Illustration.png)
+
+
+<!-- TODO nf-core: Include a figure that guides the user through the major workflow steps. Many nf-core
+     workflows use the "tube map" design for that. See https://nf-co.re/docs/contributing/design_guidelines#examples for examples.   -->
+<!-- TODO nf-core: Fill in short bullet-pointed list of the default steps in the pipeline -->
+
+1. Read QC ([`FastQC`](https://www.bioinformatics.babraham.ac.uk/projects/fastqc/))
+2. Present QC for raw reads ([`MultiQC`](http://multiqc.info/))
+
+
+> [!WARNING]
+> Please provide pipeline parameters via the CLI or Nextflow `-params-file` option. Custom config files including those provided by the `-c` Nextflow option can be used to provide any configuration _**except for parameters**_;
+> see [docs](https://nf-co.re/usage/configuration#custom-configuration-files).
+
+For more details and further functionality, please refer to the [usage documentation](https://nf-co.re/wookflow/usage) and the [parameter documentation](https://nf-co.re/wookflow/parameters).
 
 ### Example command
 
-```
-# Running Phippery Only #
-nextflow run /home/preston/PhIPSeq-Pipelines/nf-core-wookflow/main.nf \
---run_phippery True \
--profile docker \
---peptide_table InputFiles/peptide_table_VIR3_full_v2.csv \
---sample_table InputFiles/sample_table_UNSW_VirScan.csv \
---run_cpm_enr_workflow true \
---oligo_tile_length 50 \
---read_length 51 \
---results ../TestWookFlow/WookScanNextFlowTest \
---outdir ../TestWookFlow/ \
---dataset_prefix "data"
-
-# Running Phippery & AVARDA #
-nextflow run ../nf-core-wookflow/main.nf \
---run_phippery True \
---run_AVARDA True \
--profile docker \
---peptide_table InputFiles/peptide_table_VIR3_full_v2.csv \
---sample_table InputFiles/sample_table_UNSW_VirScan.csv \
---run_cpm_enr_workflow True \
---oligo_tile_length 50 \
---read_length 51 \
---results ../WookScanNextFlowTest2/TestWookFlowPhippery \
---outdir ../WookScanNextFlowTest2/ \
---dict_path ../nf-core-wookflow/subworkflows/local/AVARDA/data/dict_path/blastp_peptide_edges.csv.gz \
---total_path ../nf-core-wookflow/subworkflows/local/AVARDA/data/total_path/sequence_RefSeqOnly_bitscore80plus_total_probability_xr2.csv \
---pairwise_path ../nf-core-wookflow/subworkflows/local/AVARDA/data/pairwise_path/sequence_RefSeqOnly_bitscore80plus_unique_probabilities.csv \
---blast_path ../nf-core-wookflow/subworkflows/local/AVARDA/data/blast_path/sequence_RefSeqOnly_bitscore80plus_bitScore.csv.gz \
---out_path ../WookScanNextFlowTest2/TestWookFlow2_AVARDA \
---out_name PHIPAVARDA
-
-# Running Only AVARDA #
-nextflow run ../nf-core-wookflow/main.nf \
---run_AVARDA True \
--profile docker \
---outdir ../WookScanNextFlowTest2/ \
---case ../nf-core-wookflow/subworkflows/local/AVARDA/data/example_input/AVARDA_test_data.tsv.gz \
---dict_path ../nf-core-wookflow/subworkflows/local/AVARDA/data/dict_path/blastp_peptide_edges.csv.gz \
---total_path ../nf-core-wookflow/subworkflows/local/AVARDA/data/total_path/sequence_RefSeqOnly_bitscore80plus_total_probability_xr2.csv \
---pairwise_path ../nf-core-wookflow/subworkflows/local/AVARDA/data/pairwise_path/sequence_RefSeqOnly_bitscore80plus_unique_probabilities.csv \
---blast_path ../nf-core-wookflow/subworkflows/local/AVARDA/data/blast_path/sequence_RefSeqOnly_bitscore80plus_bitScore.csv.gz \
---out_path ../WookScanNextFlowTest2/TestWookFlow2_AVARDA \
---out_name PHIPAVARDA \
---avarda_names ../nf-core-wookflow/subworkflows/local/AVARDA/data/avarda_names/avarda_names.csv.gz
-
-**Note 1**: After gitclone 'https://github.com/TheWookHub/Preston_VirScan_Nextflow.git' in the terminal and entered to **Preston_VirScan_Nextflow** directory. Since the Pre-PhIP-Seq pipeline has not yet been merged into the main branch, the user need to run 
-```sh
-git branch -a 
-```
-in the terminal to check which branch you are currently on. Then, run 
-```sh
-git checkout shouyu_work
-```
-to move to the branch containing the complete Pre-PhIP-Seq process. After doing this, execute the following command.
-
-**Note 2**: If you want to test the success of the Pre-PhIP-Seq pipeline, you can use the built-in test configuration file. This test configuration file is located in **conf/test.config**. This configuration file uses the virus sequence files located in the **assets/bips_test_data, assets/oligo_csv, assets/oligo_fa** directories of the project. 
-
-Open the **conf/test.config file**, since the test of four modes are commented out, you are required to uncomment them before testing each one. Then, run the pipeline test using the command  
-```sh
-nextflow run main.nf -profile test
-```
-This command provides a standardized and fully reproducible method for each workflow branch.
+#### Running Pre-PhIPSeq pipeline to generate oligo libraries
 
 ```
 # Mode 1: bips_then_dolphyn (Full Workflow) #
@@ -124,25 +87,65 @@ nextflow run /home/shouyu/Preston_VirScan_Nextflow/main.nf \
 
 ```
 
+**Note**: If you want to test the success of the Pre-PhIP-Seq pipeline, you can use the built-in test configuration file. This test configuration file is located in **conf/test.config**. This configuration file uses the virus sequence files located in the **assets/bips_test_data, assets/oligo_csv, assets/oligo_fa** directories of the project. 
+
+Open the **conf/test.config file**, since the test of four modes are commented out, you are required to uncomment them before testing each one. Then, run the pipeline test using the command  
+```sh
+nextflow run main.nf -profile test
+```
+This command provides a standardized and fully reproducible method for each workflow branch.
+
+#### Running Post-PhIPSeq Analysis on fastq files
+
+```
+# Running Phippery Only #
+nextflow run /home/preston/PhIPSeq-Pipelines/nf-core-wookflow/main.nf \
+--run_phippery True \
+-profile docker \
+--peptide_table InputFiles/peptide_table_VIR3_full_v2.csv \
+--sample_table InputFiles/sample_table_UNSW_VirScan.csv \
+--run_cpm_enr_workflow true \
+--oligo_tile_length 50 \
+--read_length 51 \
+--results ../TestWookFlow/WookScanNextFlowTest \
+--outdir ../TestWookFlow/ \
+--dataset_prefix "data"
+
+# Running Phippery & AVARDA #
+nextflow run ../nf-core-wookflow/main.nf \
+--run_phippery True \
+--run_AVARDA True \
+-profile docker \
+--peptide_table InputFiles/peptide_table_VIR3_full_v2.csv \
+--sample_table InputFiles/sample_table_UNSW_VirScan.csv \
+--run_cpm_enr_workflow True \
+--oligo_tile_length 50 \
+--read_length 51 \
+--results ../WookScanNextFlowTest2/TestWookFlowPhippery \
+--outdir ../WookScanNextFlowTest2/ \
+--dict_path ../nf-core-wookflow/subworkflows/local/AVARDA/data/dict_path/blastp_peptide_edges.csv.gz \
+--total_path ../nf-core-wookflow/subworkflows/local/AVARDA/data/total_path/sequence_RefSeqOnly_bitscore80plus_total_probability_xr2.csv \
+--pairwise_path ../nf-core-wookflow/subworkflows/local/AVARDA/data/pairwise_path/sequence_RefSeqOnly_bitscore80plus_unique_probabilities.csv \
+--blast_path ../nf-core-wookflow/subworkflows/local/AVARDA/data/blast_path/sequence_RefSeqOnly_bitscore80plus_bitScore.csv.gz \
+--out_path ../WookScanNextFlowTest2/TestWookFlow2_AVARDA \
+--out_name PHIPAVARDA
+
+# Running Only AVARDA #
+nextflow run ../nf-core-wookflow/main.nf \
+--run_AVARDA True \
+-profile docker \
+--outdir ../WookScanNextFlowTest2/ \
+--case ../nf-core-wookflow/subworkflows/local/AVARDA/data/example_input/AVARDA_test_data.tsv.gz \
+--dict_path ../nf-core-wookflow/subworkflows/local/AVARDA/data/dict_path/blastp_peptide_edges.csv.gz \
+--total_path ../nf-core-wookflow/subworkflows/local/AVARDA/data/total_path/sequence_RefSeqOnly_bitscore80plus_total_probability_xr2.csv \
+--pairwise_path ../nf-core-wookflow/subworkflows/local/AVARDA/data/pairwise_path/sequence_RefSeqOnly_bitscore80plus_unique_probabilities.csv \
+--blast_path ../nf-core-wookflow/subworkflows/local/AVARDA/data/blast_path/sequence_RefSeqOnly_bitscore80plus_bitScore.csv.gz \
+--out_path ../WookScanNextFlowTest2/TestWookFlow2_AVARDA \
+--out_name PHIPAVARDA \
+--avarda_names ../nf-core-wookflow/subworkflows/local/AVARDA/data/avarda_names/avarda_names.csv.gz
+``` 
 
 
-## Introduction
-
-**nf-core/wookflow** is a bioinformatics pipeline that integrates phippery and AVARDA together into one nextflow structure. The idea is to allow a smooth flow from fastq files to read counts data that are ready for down stream analyses. While phippery outputs counts data together with edgeR hits to identify peptides that were significantly occurring above background noise, AVARDA will take the hits data to determine which species have been observed based on the peptide hits. AVARDA also accounts for the potential similarity between peptides that come from organisms with high similarity in their genetics. This in turn allows the determination of whether a species can be uniquely identified as due to existence of peptides that were exclusively from that species.
-
-<!-- TODO nf-core: Include a figure that guides the user through the major workflow steps. Many nf-core
-     workflows use the "tube map" design for that. See https://nf-co.re/docs/contributing/design_guidelines#examples for examples.   -->
-<!-- TODO nf-core: Fill in short bullet-pointed list of the default steps in the pipeline -->
-
-1. Read QC ([`FastQC`](https://www.bioinformatics.babraham.ac.uk/projects/fastqc/))
-2. Present QC for raw reads ([`MultiQC`](http://multiqc.info/))
-
-
-> [!WARNING]
-> Please provide pipeline parameters via the CLI or Nextflow `-params-file` option. Custom config files including those provided by the `-c` Nextflow option can be used to provide any configuration _**except for parameters**_;
-> see [docs](https://nf-co.re/usage/configuration#custom-configuration-files).
-
-For more details and further functionality, please refer to the [usage documentation](https://nf-co.re/wookflow/usage) and the [parameter documentation](https://nf-co.re/wookflow/parameters).
 
 ## Pipeline output
 
