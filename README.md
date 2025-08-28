@@ -9,18 +9,19 @@
 
 ## Introduction
 
-**nf-core/wookflow** is a bioinformatics pipeline that integrates several tools into one. The pipeline can be broken down into two components. Pre-PhIPSeq oligonucleotide library generation and Post-PhIPSeq sequence analysis. Briefly, PhIPSeq (Phage Immunoprecipitate Sequencing) is a technique that makes use of phages to display peptides on the surface such that antibodies can bind onto. This is followed by separating phages bound by antibodies to those that aren't through the use of magnetic beads. Non-bound beads are then washed away with the remaining bound phages progress to sequencing. For Pre-PhIPSeq BIPS and Dolphyn have been integrated to support custom oligonucleotide library support while phippery supports Post-PhIPSeq data analysis. AVARDA (also Post-PhIPSeq) is a VirScan (defined Human virome oligonucleotide library) Library specific tool that helps to identify individual species of viruses when cross-reactivity exists (Fig. 1).
+**nf-core/wookflow** is a bioinformatics pipeline that integrates several tools into one. The pipeline can be broken down into two components. Pre-PhIPSeq oligonucleotide library generation and Post-PhIPSeq sequence analysis. Briefly, PhIPSeq (Phage Immunoprecipitate Sequencing) is a technique that makes use of phages to display peptides on the surface such that antibodies can bind onto. This is followed by separating phages bound by antibodies to those that aren't through the use of magnetic beads. Non-bound beads are then washed away with the remaining bound phages progress to sequencing. For Pre-PhIPSeq BIPS and Dolphyn have been integrated to support custom oligonucleotide library support while phippery supports Post-PhIPSeq data analysis. AVARDA (also Post-PhIPSeq) is a VirScan (defined Human virome oligonucleotide library) Library specific tool that helps to identify individual species of viruses when cross-reactivity exists (Fig. 1). Unfortunately the open source AVARDA is currently an unmonitored project with developers having moved on, implementations adapting AVARDA to other oligonucleotide library will be a future project (unsure when).
 
-Pre-PhIPSeq library generation (Fig. 1) aims to provide an integrated approach to go from protein sequences direcctly to oligonucleotide library such that it can be synthesised and be ready for PhIPSeq experiments. Post-PhIPSeq analysis (Fig. 1) aims to allow a smooth flow from fastq files to read counts data that are ready for down stream analyses. While phippery outputs counts data together with edgeR hits to identify peptides that were significantly occurring above background noise, AVARDA will take the hits data to determine which species have been observed based on the peptide hits. AVARDA also accounts for the potential similarity between peptides that come from organisms with high similarity in their genetics. This in turn allows the determination of whether a species can be uniquely identified as due to existence of peptides that were exclusively from that species.
+Pre-PhIPSeq library generation (Fig. 1) aims to provide an integrated approach to go from protein sequences direcctly to oligonucleotide library such that it can be synthesised and be ready for PhIPSeq experiments. Post-PhIPSeq analysis (Fig. 1) aims to allow a smooth flow from fastq files to read counts data that are ready for down stream analyses. While phippery outputs counts data together with edgeR hits to identify peptides that were significantly occurring above background noise, AVARDA will take the hits data to determine which species have been observed based on the peptide hits. AVARDA also accounts for the potential similarity between peptides that come from organisms with high similarity in their genetics. This in turn allows the determination of whether a species can be uniquely identified as due to existence of peptides that were exclusively from that species. 
 
 
 ![Test Image](https://github.com/TheWookHub/Preston_VirScan_Nextflow/blob/main_mod/readme_figures/WookFlow_Illustration.png)
 
 ***Fig 1.** WookScan overview. Left side illustrates Pre-PhIPSeq library generation and right side shows Post-PhIPSeq analysis. The centre component illustrates the wet laboratory procedure during a PhIPSeq experiment.*
 
-### Example command
 
-#### Running Pre-PhIPSeq pipeline to generate oligo libraries
+**Note:** You cannot run Pre-PhIPSeq and Post-PhIPSeq at the same time because the input of Post-PhIPSeq requires the actual sequencing data generated from the wetlab (PhIPSeq) experiment.
+
+## Running Pre-PhIPSeq pipeline to generate oligo libraries
 
 ```
 # Mode 1: bips_then_dolphyn (Full Workflow) #
@@ -73,15 +74,15 @@ nextflow run /home/shouyu/Preston_VirScan_Nextflow/main.nf \
 
 ```
 
-**Note**: If you want to test the success of the Pre-PhIP-Seq pipeline, you can use the built-in test configuration file. This test configuration file is located in **conf/test.config**. This configuration file uses the virus sequence files located in the **assets/bips_test_data, assets/oligo_csv, assets/oligo_fa** directories of the project. 
+**Note**: If you want to test the success of the Pre-PhIP-Seq pipeline, you can use the built-in test configuration file. This test configuration file is located in **conf/test.config**. This configuration file uses the virus sequence files located in the `assets/bips_test_data`, `assets/oligo_csv`, `assets/oligo_fa` directories of the project. 
 
-Open the **conf/test.config file**, since the test of four modes are commented out, you are required to uncomment them before testing each one. Then, run the pipeline test using the command  
+Open the `conf/test.config file`, since the test of four modes are commented out, you are required to uncomment them before testing each one. Then, run the pipeline test using the command  
 ```sh
 nextflow run main.nf -profile test
 ```
 This command provides a standardized and fully reproducible method for each workflow branch.
 
-#### Running Post-PhIPSeq Analysis on fastq files
+## Running Post-PhIPSeq Analysis on fastq files
 
 General phippery runs when your fastq files are already trimmed and filtered. You can optionally give the raw fastq files to wookflow and then turn `--run_fastp True` in the parameters and Wookflow will run them through fastp. To specify the path of fastq files edit it in the `.csv` file for `--sample_table` input.
 
@@ -133,17 +134,20 @@ nextflow run ../nf-core-wookflow/main.nf \
 
 ``` 
 
-
-
 ## Pipeline output
 
-To see the results of an example test run with a full size dataset refer to the [results](https://nf-co.re/wookflow/results) tab on the nf-core website pipeline page.
-For more details about the output files and reports, please refer to the
-[output documentation](https://nf-co.re/wookflow/output).
+When generating the Pre-PhIPSeq oligonucleotide library, the output will be located at where you've defined  `--outdir` to be. 
+
+
 
 ## Credits
 
 We thank the following people for their extensive assistance in the development of this pipeline:
+
+- Anthony Edward Stark
+- Steven Grant Rogers
+- Kiriko Yamagami 
+
 
 <!-- TODO nf-core: If applicable, make list of people who have also contributed -->
 
@@ -174,4 +178,7 @@ nf-core/wookflow was originally written by Preston Leung, but the components tha
 For more details and further functionality, please refer to the [usage documentation](https://nf-co.re/wookflow/usage) and the [parameter documentation](https://nf-co.re/wookflow/parameters).
 
 
+To see the results of an example test run with a full size dataset refer to the [results](https://nf-co.re/wookflow/results) tab on the nf-core website pipeline page.
+For more details about the output files and reports, please refer to the
+[output documentation](https://nf-co.re/wookflow/output).
 
