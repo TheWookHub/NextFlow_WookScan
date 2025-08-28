@@ -1,11 +1,4 @@
-# Nextflow for VirScan Pipeline
-
-**Contributors**
- - Preston Leung
- - Bea Delgado-Corrales
- - Legana Fingerhut
- - Shouyu (Coco) Wei 
-
+# Wookflow Pipeline
 
 ## Introduction
 
@@ -16,7 +9,7 @@ Pre-PhIPSeq library generation (Fig. 1) aims to provide an integrated approach t
 
 ![Test Image](readme_figures/WookFlow_Illustration.png)
 
-***Fig 1.** WookScan overview. Left side illustrates Pre-PhIPSeq library generation and right side shows Post-PhIPSeq analysis. The centre component illustrates the wet laboratory procedure during a PhIPSeq experiment.*
+***Fig 1.** WookScan overview. Left side illustrates Pre-PhIPSeq library generation and right side shows Post-PhIPSeq analysis. The centre component illustrates the wet laboratory procedure during a PhIPSeq experiment. Figure generated using BioRender (www.biorender.com)*
 
 
 **Note:** You cannot run Pre-PhIPSeq and Post-PhIPSeq at the same time because the input of Post-PhIPSeq requires the actual sequencing data generated from the wetlab (PhIPSeq) experiment.
@@ -74,7 +67,7 @@ nextflow run /home/shouyu/Preston_VirScan_Nextflow/main.nf \
 
 ```
 
-**Note**: If you want to test the success of the Pre-PhIP-Seq pipeline, you can use the built-in test configuration file. This test configuration file is located in **conf/test.config**. This configuration file uses the virus sequence files located in the `assets/bips_test_data`, `assets/oligo_csv`, `assets/oligo_fa` directories of the project. 
+**Note**: If you want to test the success of the Pre-PhIP-Seq pipeline, you can use the built-in test configuration file. This test configuration file is located in `conf/test.config`. This configuration file uses the virus sequence files located in the `assets/bips_test_data`, `assets/oligo_csv`, `assets/oligo_fa` directories of the project. 
 
 Open the `conf/test.config file`, since the test of four modes are commented out, you are required to uncomment them before testing each one. Then, run the pipeline test using the command  
 ```sh
@@ -140,18 +133,25 @@ When generating the Pre-PhIPSeq oligonucleotide library, the output will be loca
 
 
 
-## Credits
+## Contributors to WookScan
 
-We thank the following people for their extensive assistance in the development of this pipeline:
+**Bioinformaticians involved in the pipeline development:**
+ - Preston Leung
+ - Bea Delgado-Corrales
+ - Legana Fingerhut
+ - Shouyu (Coco) Wei 
 
-- Anthony Edward Stark
+
+We also thank the following people for their extensive assistance in the development of this pipeline:
+
+- Ki Wook Kim
 - Steven Grant Rogers
-- Kiriko Yamagami 
+
 
 
 <!-- TODO nf-core: If applicable, make list of people who have also contributed -->
 
-## Contributions and Support
+## Support WookScan
 
 If you would like to contribute to this pipeline, please see the [contributing guidelines](.github/CONTRIBUTING.md).
 
