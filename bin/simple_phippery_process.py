@@ -101,7 +101,7 @@ anno_counts = peptide_table.loc[
     right_index=True
 ).rename(columns = reNameDict)
 
-# annoated hits counts 
+# annotated hits counts 
 # counts that were not a hit will be flattened to 0
 anno_hits_counts = peptide_table.loc[
     :,['original_id','Species']
@@ -112,6 +112,15 @@ anno_hits_counts = peptide_table.loc[
     left_index = True,
     right_index = True
 )
+
+# annotated zscores
+anno_zscore = peptide_table.loc[
+    :,['original_id','Species']
+].merge(
+    phip_data.zscore.to_pandas(), 
+    left_index = True, 
+    right_index = True
+).rename(columns = reNameDict)
 
 # Summarise how many hits counts per species
 hits_counts_species = getPeptideSummary(observation_only, anno_hits_counts)
@@ -126,3 +135,5 @@ anno_hits.to_csv("hits.csv")
 anno_hits_counts.to_csv("hits_counts.csv")
 hits_counts_species.to_csv("hits_counts_species.csv")
 peptide_hit_per_species.to_csv("peptide_hit_per_species.csv")
+anno_counts.to_csv("counts.csv")
+anno_zscore.to_csv("zscore.csv")
