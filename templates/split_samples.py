@@ -39,16 +39,26 @@ logger.info(f"Sample mapping table has {df.shape[0]:,} rows and {df.shape[1]:,} 
 # The user must specify the column used to group replicates
 # from the same sample
 sample_grouping_col = "!{params.sample_grouping_col}"
+if len(sample_grouping_col) > 0:
 
-msg = f"Column '{sample_grouping_col}' not found ({', '.join(df.columns.values)})"
-assert sample_grouping_col in df.columns.values, msg
+    # Make sure tha the column is present in the table
+    msg = f"Column '{sample_grouping_col}' not found ({', '.join(df.columns.values)})"
+    assert sample_grouping_col in df.columns.values, msg
 
-# Write out a file containing the unique list of sample names
-df.reindex(
-    columns=[sample_grouping_col]
-).drop_duplicates(
-).to_csv(
-    "sample_list",
-    header=None,
-    index=None
-)
+    # Write out a file containing the unique list of sample names
+    df.reindex(
+        columns=[sample_grouping_col]
+    ).drop_duplicates(
+    ).to_csv(
+        "sample_list",
+        header=None,
+        index=None
+    )
+# if no such grouping was found
+else:
+
+    # Just write out a list of each replciate
+    with open("sample_list","w") as handle:
+        handle.write(
+            "\n".join(list(map(str,df.index.values)))
+        )

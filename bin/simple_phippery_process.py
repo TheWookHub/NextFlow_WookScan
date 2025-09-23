@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
-import phippery as ph; import pandas as pd; import datatable as dt
+import phippery as ph; import pandas as pd; 
+# import datatable as dt
 import argparse
 
 #####################

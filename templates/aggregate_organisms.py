@@ -4,6 +4,7 @@ import os
 from typing import List
 import pandas as pd
 import logging
+from scipy.stats import gmean
 
 # APPROACH
 
@@ -80,11 +81,12 @@ class AggregatePhIP:
             self.logger.info(f"Reading in edgeR hits from: {edgeR_hits_fp}")
             self.edgeR_hits = pd.read_csv(
                 edgeR_hits_fp,
-                index_col=0
-            # ).applymap(
-            ).map(
-                bool
+                index_col=0,
+                true_values=["TRUE", "True", "true"],
+                false_values=["FALSE", "False", "false"],
+                na_values=["NA", "N/A", "Na", "na", "n/a"]
             )
+            self.has_edgeR_hits = True
         else:
             self.edgeR_hits = False
 
@@ -92,6 +94,10 @@ class AggregatePhIP:
         self.logger.info("Grouping replicates by sample")
         self.sample_table = self.group_replicates()
 
+        # Apply the max_overlap filter
+        # (setting the column 'passes_filter' to True if the peptide passes)
+        self.sample_table = self.apply_max_overlap_filter()
+        
         # Save to CSV
         self.sample_table.to_csv("!{sample_id}.peptide.ebs.csv.gz", index=None)
 
@@ -137,13 +143,24 @@ class AggregatePhIP:
         # The user must specify the column used to group replicates
         # from the same sample
         sample_grouping_col = "!{params.sample_grouping_col}"
+        if len(sample_grouping_col) > 0:
 
-        msg = f"Column '{sample_grouping_col}' not found ({', '.join(df.columns.values)})"
-        assert sample_grouping_col in df.columns.values, msg
+            # Make sure that the column is present in the table
+            msg = f"Column '{sample_grouping_col}' not found ({', '.join(df.columns.values)})"
+            assert sample_grouping_col in df.columns.values, msg
 
-        # Return the column mapping of replicates to samples
-        return df[sample_grouping_col]
+            # Return the column mapping of replicates to samples
+            return df[sample_grouping_col]
+        
+        # Otherwise, if no grouping was specified
+        else:
 
+             # Just treat each sample the same
+            return {
+                int(replicate_id): str(replicate_id)
+                for replicate_id in df.index.values
+            }
+        
     def read_peptide_mapping(self) -> pd.DataFrame:
         """Read the table mapping peptides (by ID) to organism, protein, and start position ('pos')."""
 
@@ -230,19 +247,28 @@ class AggregatePhIP:
 
         # Take a slice of the table
         df = self.zscores.reindex(columns=replicates)
+        # If we have edgeR data, filter it to the same replicates
+        if self.has_edgeR_hits:
+            self.edgeR_hits = self.edgeR_hits.reindex(columns=replicates)
 
         # Add summary metrics
         df = df.assign(
             n_replicates=len(replicates),
             EBS=df.mean(axis=1),
             hit=df.apply(self.classify_hit, axis=1),
-            edgeR_hit=df.apply(self.classify_edgeR_hit, axis=1) if self.edgeR_hits is not None else None,
+            edgeR_hit=(
+                self.edgeR_hits.apply(self.classify_edgeR_hit, axis=1)
+                if self.has_edgeR_hits
+                else None
+            ),
             sample='!{sample_id}'
         ).reset_index(
         ).rename(
             columns=dict(index="peptide")
         ).drop(
-            columns=replicates
+            columns=replicates + (
+                ["edgeR_hit"] if not self.has_edgeR_hits else []
+            )
         )
 
         # Mark whether each peptide is public
@@ -257,7 +283,8 @@ class AggregatePhIP:
     def classify_hit(self, r):
         """Determine whether a peptide is a hit, or discordant."""
 
-        # Get the vector of whether each replicate is above the z-score threshold
+        # Get the vector of whether each replicate 
+        # is above the z-score threshold
         hit_vec = r > self.zscore_threshold
 
         # Determine the hit type
@@ -269,8 +296,16 @@ class AggregatePhIP:
             return "DISCORDANT"
 
     def classify_edgeR_hit(self, r):
-        """Determine whether a peptide is a hit, or discordant - based on edgeR hits."""
-
+        """
+        Determine whether a peptide is a hit, or discordant - 
+        based on edgeR hits.
+        """
+        
+        # Drop NA values before classification
+        r = r.dropna()
+        if len(r) == 0:  # If all values were NA
+            return "NA"
+        
         # Determine the hit type
         if r.all():
             return "TRUE"
@@ -278,6 +313,78 @@ class AggregatePhIP:
             return "FALSE"
         else:
             return "DISCORDANT"
+
+    def apply_max_overlap_filter(self) -> pd.DataFrame:
+        """Apply the max_overlap filter to each sample/organism."""
+
+        # Analyze each sample/organism independently
+        df = pd.concat([
+            self.apply_max_overlap_filter_sub(d)
+            for _, d in self.sample_table.assign(
+                organism=lambda d: d["peptide"].apply(
+                    self.peptide_mapping["organism"].get
+                )
+            ).groupby(
+                ["sample", "organism"]
+            )
+        ])
+
+        return df
+
+    def apply_max_overlap_filter_sub(
+        self,
+        df: pd.DataFrame
+    ) -> pd.DataFrame:
+
+        # Add the sequence information for each peptide
+        df = df.assign(
+            seq=df["peptide"].apply(
+                self.peptide_mapping["seq"].get
+            ).apply(
+                lambda s: s.rstrip("*")
+            )
+        )
+
+        # Sort by EBS (descending)
+        df = df.sort_values(by="EBS", ascending=False)
+
+        # Keep track of the peptide kmers which have been observed so far
+        kmers_seen = set()
+
+        # Make a list of the indices pass the filter
+        passes_filter = list()
+
+        # Go down the list, starting with the tightest binders
+        for _, r in df.iterrows():
+
+            # Get the kmers by this peptide
+            row_kmers = set([
+                r["seq"][n:(n + self.max_overlap)]
+                for n in range(len(r["seq"]) - self.max_overlap)
+            ])
+
+            # If none of those kmers have been seen before,
+            # it passes the filter
+            passes_filter.append(len(row_kmers & kmers_seen) == 0)
+
+            # If it passes
+            if passes_filter[-1]:
+
+                # Add the covered positions
+                kmers_seen |= row_kmers
+
+        # Add a column to the table indicating
+        # whether the peptide passes the filter
+        df = df.assign(
+            passes_filter=passes_filter
+        )
+
+        # Drop the sequence column
+        return (
+            df
+            .drop(columns=["seq"])
+            .sort_index()
+        )
 
     def group_organisms(self) -> pd.DataFrame:
         """Group together the results by organism."""
@@ -298,49 +405,17 @@ class AggregatePhIP:
 
         return df
 
-    def group_sample_organisms(self, df:pd.DataFrame, sample:str, organism:str) -> pd.DataFrame:
+    def group_sample_organisms(
+            self, 
+            df:pd.DataFrame, 
+            sample:str, 
+            organism:str
+        ) -> pd.DataFrame:
+        
         """Analyze the data for a single sample, single organism."""
 
-        # Add the sequence information for each peptide
-        df = df.assign(
-            seq=df["peptide"].apply(
-                self.peptide_mapping["seq"].get
-            ).apply(
-                lambda s: s.rstrip("*")
-            )
-        )
-
-        # Sort by EBS (descending)
-        df = df.sort_values(by="EBS", ascending=False)
-
-        # Keep track of the peptide kmers which have been observed so far
-        kmers_seen = set()
-
-        # Make a list of the indices which will be dropped
-        to_drop = list()
-
-        # Go down the list, starting with the tightest binders
-        for i, r in df.iterrows():
-
-            # Get the kmers by this peptide
-            row_kmers = set([
-                r["seq"][n:(n + self.max_overlap)]
-                for n in range(len(r["seq"]) - self.max_overlap)
-            ])
-
-            # If any of those kmers have been seen before
-            if len(row_kmers & kmers_seen) > 0:
-
-                # Drop the row
-                to_drop.append(i)
-
-            # If not
-            else:
-
-                # Add the covered positions
-                kmers_seen |= row_kmers
-
-        df = df.drop(index=to_drop)
+        # For this summary, drop peptides which don't pass the filter
+        df = df.query("passes_filter")
 
         # Return the number of hits, etc. for all and just public epitopes
         dat = pd.DataFrame([{
@@ -357,14 +432,25 @@ class AggregatePhIP:
                 for k, v in [
                     (f"n_hits_{label}", (d["hit"] == "TRUE").sum()),
                     (f"n_discordant_{label}", (d["hit"] == "DISCORDANT").sum()),
-                    (f"n_edgeR_hits_{label}", (d["edgeR_hit"] == "TRUE").sum()),
-                    (f"n_edgeR_discordant_{label}", (d["edgeR_hit"] == "DISCORDANT").sum()),
                     (f"max_ebs_{label}", d["EBS"].max()),
-                    (f"mean_ebs_{label}", d["EBS"].mean())
+                    (f"mean_ebs_{label}", d["EBS"].mean()),
+                    (f"gmean_ebs_{label}", gmean(d["EBS"]))
+                ] + (
+                    [
+                        (f"n_edgeR_hits_{label}", (d["edgeR_hit"] == "TRUE").sum()),
+                        (f"n_edgeR_discordant_{label}", (d["edgeR_hit"] == "DISCORDANT").sum()),
+                    ]
+                    if self.has_edgeR_hits
+                    else []
+                )
+                if k not in [
+                    "n_hits_hits",
+                    "n_discordant_hits",
+                    "gmean_ebs_all",
+                    "gmean_ebs_public"
                 ]
-                if k not in ["n_hits_hits", "n_discordant_hits"]
             }
-        }])
+        }])       
 
         return dat
 
