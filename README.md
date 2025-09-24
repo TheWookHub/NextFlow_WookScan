@@ -77,7 +77,9 @@ This command provides a standardized and fully reproducible method for each work
 
 ## Running Post-PhIPSeq Analysis on fastq files
 
-General phippery runs when your fastq files are already trimmed and filtered. You can optionally give the raw fastq files to wookflow and then turn `--run_fastp True` in the parameters and Wookflow will run them through fastp. To specify the path of fastq files edit it in the `.csv` file for `--sample_table` input.
+Two main files that are required for Phippery component is the `--sample_table` which stores information about location of the fastq files, along with metadata associated with the samples. The second file is the `--peptide_table`, and this table stores the annotations of each peptide in the PhIPSeq Library. For example in the VirScan library, each one of the 106,678 peptides will have **Species**, **Prot** etc. to be used as reference for determining how many sequenced reads fall into what peptide from which species.
+
+General phippery runs assume fastq files are already trimmed and filtered. You can optionally give the raw fastq files to wookflow and then turn `--run_fastp True` in the parameters and Wookflow will run them through fastp. To specify the path of fastq files edit it in the `.csv` file for `--sample_table` input.
 
 ```
 # Running Phippery Only #
@@ -126,6 +128,108 @@ nextflow run ../nf-core-wookflow/main.nf \
 --max_memory '36.GB'
 
 ``` 
+
+## Other adjustable Phippery parameters
+
+Default values are shown in square bracers `[]`. 
+
+```
+# ************************************* 
+# Switching analysis workflows on/off * 
+# ************************************* 
+    --run_zscore_fit_predict [true]        # run zscore workflow or not
+    --run_cpm_enr_workflow [false]         # run counts per million workflow or not
+    --run_edgeR [true]                     # run edgeR or not
+    --run_BEER [false]                     # run BEER statistics or not
+
+# *************************************
+# Alignment options                   *
+# *************************************
+    --oligo_tile_length [117]              # peptide oligo encoding length for alignment
+    --read_length [125]                    # read length for alignment
+    --n_mismatches [2]                     # mismatches allowed (end-to-end)
+    --replicate_sequence_counts [true]     # Flag for replicating counts for replicate sequences
+
+# ********************************************
+# Grouping peptides by species or categories *
+# ********************************************    
+    --summarize_by_organism [true]              # turn on summarise peptide detection by organism
+    --max_overlap [7]                           # Maximum allowed overlap between detected peptides    
+    --zscore_threshold [2.5]                    # Minimum z-score threshold    
+    --edgeR_threshold [0.05]                    # Maximum edgeR threshold (BH-adjusted p-value)
+    --peptide_org_col [Species]                 # Column in the peptide table indicating the organism for each peptide
+    --sample_grouping_col [sample_source]       # Column in the sample table used for mapping replicates to samples
+    --peptide_seq_col [Prot]                    # Column in the peptide table containing the peptide sequence (For matching known epitopes & filter overlapping peptides)
+        
+    # Below params are optional to include when summarize_by_organism is switched on.    
+    
+    # Directory for storing known epitopes to check alignment with peptides
+    # $projectDir is a nextflow variable of where the nextflow project is stored.
+    --public_epitopes_csv = [$projectDir/templates/public_epitope_template.csv"]
+    
+    # Column name containing the translated amino acid sequence for known epitopes
+    --public_epitopes_col [peptide_translate]
+        
+# **************************
+# Output file type options *  
+# **************************    
+    --output_tall_csv [true]              # dish out tall (long) format csv
+    --output_pickle_xarray [true]         # Output Xarray pickle (.phip file)
+    --output_wide_csv [true]              # Output wide format ds     
+    
+# *************************************
+# Output file location options        *
+# *************************************    
+    --results [$PWD/phippery_results]       # setting where to output results to
+
+
+
+# **********************************
+# Other available option(s)        *
+# **********************************
+    --dataset_prefix [data]              # the name of .phip file. E.g. data.phip
+    --user_pep_id [WOOKSCAN_000]         # Prefix of user_pep_id for AVARDA's use
+    --fastq_stream_func [zcat]           # sample read options. Set this as 'cat' if fastq files not g'zipped. Change to 'gzcat' if you're on macOS.
+```
+
+## AVARDA parameters
+```
+#############################################################
+# TODO: Describe below input params and also indicate       #
+#       which ones shouldn't really be fiddled with unless  #
+#       you know what you're doing.                         # 
+#############################################################
+
+
+# input 1
+    params.case_path = "$baseDir/subworkflows/local/AVARDA/data/example_input/AVARDA_test_data.tsv.gz"
+    
+# input 2
+    params.threshold = 1
+    
+# input 3
+    params.dict_path = "$baseDir/subworkflows/local/AVARDA/data/dict_path/my_df.csv.gz"
+    
+# input 4
+    params.total_path = "$baseDir/subworkflows/local/AVARDA/data/total_path/total_probability_xr2.csv.gz"
+    
+# input 5    
+    params.pairwise_path = "$baseDir/subworkflows/local/AVARDA/data/pairwise_path/unique_probabilities3.csv.gz"
+    
+# input 6
+    params.blast_path = "$baseDir/subworkflows/local/AVARDA/data/blast_path/VirScan_filtered_virus_blast_new.csv.gz"
+    
+# input 7    
+    params.out_path = "$PWD/avarda_results/"
+        
+# input 8
+    params.out_name = "AVARDA_Output_"    
+
+# input 9
+    params.avarda_names = "$baseDir/subworkflows/local/AVARDA/data/avarda_names/avarda_names.csv.gz"
+
+```
+
 
 ## Pipeline output
 
