@@ -193,6 +193,8 @@ Default values are shown in square bracers `[]`.
 ```
 
 ## AVARDA parameters
+Default values are shown in square bracers `[]`. 
+
 ```
 #############################################################
 # TODO: Describe below input params and also indicate       #
@@ -201,32 +203,41 @@ Default values are shown in square bracers `[]`.
 #############################################################
 
 
-# input 1
-    params.case_path = "$baseDir/subworkflows/local/AVARDA/data/example_input/AVARDA_test_data.tsv.gz"
+# input 1 - file usually containing binary values of T/F or 1/0 to indicate if peptide was a hit.
+    --case_path [$baseDir/subworkflows/local/AVARDA/data/example_input/AVARDA_test_data.tsv.gz]
     
-# input 2
-    params.threshold = 1
-    
-# input 3
-    params.dict_path = "$baseDir/subworkflows/local/AVARDA/data/dict_path/my_df.csv.gz"
-    
-# input 4
-    params.total_path = "$baseDir/subworkflows/local/AVARDA/data/total_path/total_probability_xr2.csv.gz"
-    
-# input 5    
-    params.pairwise_path = "$baseDir/subworkflows/local/AVARDA/data/pairwise_path/unique_probabilities3.csv.gz"
-    
-# input 6
-    params.blast_path = "$baseDir/subworkflows/local/AVARDA/data/blast_path/VirScan_filtered_virus_blast_new.csv.gz"
-    
-# input 7    
-    params.out_path = "$PWD/avarda_results/"
-        
-# input 8
-    params.out_name = "AVARDA_Output_"    
 
-# input 9
-    params.avarda_names = "$baseDir/subworkflows/local/AVARDA/data/avarda_names/avarda_names.csv.gz"
+# input 7 - location to place results
+    --out_path [$PWD/avarda_results/]
+        
+# input 8 - prefix for naming output files
+    --out_name [AVARDA_Output_]
+
+
+# ******************************************************************
+# Only change these hard coded files if you know what you're doing *
+* These are all set by authors of AVARDA.                          *
+# ******************************************************************
+
+# input 2 - thershold 1 means input 1 is a binary file. 
+    --threshold [1]
+    
+# input 3 - peptide id to peptide id dictionary alignment (if the pair aligned well they are in this list)
+    --dict_path [$baseDir/subworkflows/local/AVARDA/data/dict_path/my_df.csv.gz]
+
+# input 4 - Total expected probabilities of species based on VirScan Library
+    --total_path [$baseDir/subworkflows/local/AVARDA/data/total_path/total_probability_xr2.csv.gz]
+    
+# input 5 - pairwise expected probability of obtaining a species X given species Y.
+    --pairwise_path [$baseDir/subworkflows/local/AVARDA/data/pairwise_path/unique_probabilities3.csv.gz]
+    
+# input 6 - blast alignment results of all the peptides to species. Values SHOULD BE bitscore
+# but for some reason looks more like percentage identity
+    --blast_path [$baseDir/subworkflows/local/AVARDA/data/blast_path/VirScan_filtered_virus_blast_new.csv.gz]
+
+# input 9 - file detailing peptide ids for connecting peptide <-> hits
+    --avarda_names [$baseDir/subworkflows/local/AVARDA/data/avarda_names/avarda_names.csv.gz]
+
 
 ```
 
