@@ -192,6 +192,44 @@ Default values are shown in square bracers `[]`.
     --fastq_stream_func [zcat]           # sample read options. Set this as 'cat' if fastq files not g'zipped. Change to 'gzcat' if you're on macOS.
 ```
 
+### Note on sample and peptide tables
+
+Below are two examples of what sample table and peptide table should look like. For sample table, `fastq_filespath` and `control_status` is required. other columns are optional and can be mentioned in the parameters when using certain workflows (for example, when `--summarize_by_organism` option is on, ` --sample_grouping_col` can be set to `sample_source` column).
+
+Peptide table requires minimum columns `peptide_id` and `oligo`. Similar to sample table, other additional columns are optional (for example, when `--summarize_by_organism` option is on, `--peptide_org_col` can be set to `Species` column).
+
+
+
+**Example column titles for sample table:**
+|fastq_filepath|control_status|technical_replicate_id|sample_source|
+|----|----|----|----|
+PATH/TO/sampleA_rep1_raw.fastq.gz|empirical|A-1|Sample_A|
+PATH/TO/sampleA_rep2_raw.fastq.gz|empirical|A-2|Sample_A|
+PATH/TO/sampleA_rep3_raw.fastq.gz|empirical|A-3|Sample_A|
+PATH/TO/sampleB.rep1_raw.fastq.gz|empirical|B-1|Sample_B|
+PATH/TO/sampleB.rep2_raw.fastq.gz|empirical|B-2|Sample_B|
+PATH/TO/sampleB.rep3_raw.fastq.gz|empirical|B-3|Sample_B|
+PATH/TO/beads_only_BG1_raw.fastq.gz|beads_only|BG-01|BG|
+PATH/TO/beads_only_BG2_raw.fastq.gz|beads_only|BG-02|BG|
+PATH/TO/beads_only_BG3_raw.fastq.gz|beads_only|BG-03|BG|
+PATH/TO/beads_only_BG4_raw.fastq.gz|beads_only|BG-04|BG|
+PATH/TO/beads_only_BG5_raw.fastq.gz|beads_only|BG-05|BG|
+
+
+**Example column titles for peptide table:**
+|peptide_id|original_id|oligo|UniProtEntry|VIR3Expanded_id|Species|Prot
+|-----|-----|-----|-----|-----|-----|-----|
+|0|1|ATGCGCAGCTTGCTGTTTGTGGTCGGTGCTTGGGTCGCTGCTCTCGTCAC|A0A126|1|Papiine herpesvirus 2|MRSLLFVVGAWVAALVTNLTPDAALASGTTTTAAAGNTSATASPGDNATSIDAGST|
+|1|2|ACTACAACCACCGCTGCCGCAGGGAACACATCTGCAACAGCTTCTCCAGG|A0A126|2|Papiine herpesvirus 2|TTTTAAAGNTSATASPGDNATSIDAGSTITAAAPPGHSTPWPALPTDLALPLVIGG|
+|2|3|ATTACCGCTGCCGCTCCTCCAGGTCATTCAACACCTTGGCCTGCACTCCC|A0A126|3|Papiine herpesvirus 2|ITAAAPPGHSTPWPALPTDLALPLVIGGLCALTLAAMGAGALLHRCCRRCARRRQN
+|3|4|TTGTGCGCCCTCACACTCGCAGCAATGGGCGCCGGGGCATTGCTTCATCG|A0A126|4|Papiine herpesvirus 2|LCALTLAAMGAGALLHRCCRRCARRRQNVSSVSA|
+|4|5|CGCGATCGCGGCCCTTCTCGCTCTCGCGTGCGCTACACCCGCCTGGCTGC|A0A130|5|Papiine herpesvirus 2|RDRGPSRSRVRYTRLAASEA|
+|5|6|ATGGGGTTTGGCGCCGCAGCAGCACTGTTGGCTCTGGCAGTTGCACTCGC|A0A132|6|Papiine herpesvirus 2|MGFGAAAALLALAVALARVPAGGGAYVPVDRALTRVSPNRFRGSSLPPPEQKTDPP|
+|6|7|GTGGACCGCGCACTCACACGCGTTAGCCCAAACCGCTTCCGCGGTTCATC|A0A132|7|Papiine herpesvirus 2|VDRALTRVSPNRFRGSSLPPPEQKTDPPDVRRVYH|
+
+
+
+
 ## AVARDA parameters
 Default values are shown in square bracers `[]`. 
 
