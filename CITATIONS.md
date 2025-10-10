@@ -13,6 +13,9 @@
 
 nf-core/wookflow was originally written by Preston Leung, but the components that made up the pipeline are written by their respective authors:
 
+- [fastp](https://github.com/OpenGene/fastp)
+  > Shifu Chen. **Ultrafast one-pass FASTQ data preprocessing, quality control, and deduplication using fastp.** *iMeta 2: e107.* doi:10.1002/imt2.107.
+
 - [Phippery](https://github.com/matsengrp/phippery)
   > Jared G Galloway, Kevin Sung, Samuel S Minot, Meghan E Garrett, Caitlin I Stoddard, Alexandra C Willcox, Zak A Yaffe, Ryan Yucha, Julie Overbaugh & Frederick A Matsen. **phippery: a software suite for PhIP-Seq data analysis.**, *Bioinformatics.* doi: 10.1093/bioinformatics/btad583.
 
