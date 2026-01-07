@@ -15,6 +15,7 @@ process to_csv {
 // RUN BEER
 process run_edgeR {
     // publishDir "$params.results/rds_data/", mode: 'copy', overwrite: true
+    label 'process_high'
     input:
     tuple path(phip_data), path(phip_data_csvs)
     output:
@@ -29,6 +30,7 @@ process run_edgeR {
 
 process run_BEER {
     // publishDir "$params.results/rds_data/", mode: 'copy', overwrite: true
+    label 'process_high'
     input:
     tuple path(phip_data), path("*"), path(edgeR_rds), val(method)
     output:

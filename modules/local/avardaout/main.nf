@@ -1,7 +1,7 @@
 process AVARDAOUT{
     publishDir "$params.out_path", mode: 'copy', overwrite: true
     label 'process_long'
-    container = 'docker.io/pdawgzgg/avarda_r_env:0.1'
+    //container = 'docker.io/pdawgzgg/avarda_r_env:0.1'
     debug true
     input:
         path case_path
