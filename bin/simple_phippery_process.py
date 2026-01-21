@@ -132,6 +132,7 @@ peptide_hit_per_species = anno_hits.loc[
 
 # write the outputs 
 sample_table_2.to_csv("sample_table.csv")
+peptide_table.to_csv("peptide_table.csv")
 anno_hits.to_csv("hits.csv")
 anno_hits_counts.to_csv("hits_counts.csv")
 hits_counts_species.to_csv("hits_counts_species.csv")
