@@ -4,13 +4,7 @@
 
 **nf-core/wookflow** is a bioinformatics pipeline that integrates several tools into one. The pipeline can be broken down into two components. Pre-PhIPSeq oligonucleotide library generation and Post-PhIPSeq sequence analysis. Briefly, PhIPSeq (Phage Immunoprecipitate Sequencing) is a technique that makes use of phages to display peptides on the surface such that antibodies can bind onto. This is followed by separating phages bound by antibodies to those that aren't through the use of magnetic beads. Non-bound beads are then washed away with the remaining bound phages progress to sequencing. For Pre-PhIPSeq BIPS and Dolphyn have been integrated to support custom oligonucleotide library support while phippery supports Post-PhIPSeq data analysis. AVARDA (also Post-PhIPSeq) is a VirScan (defined Human virome oligonucleotide library) Library specific tool that helps to identify individual species of viruses when cross-reactivity exists (Fig. 1). Unfortunately the open source AVARDA is currently an unmonitored project with developers having moved on, implementations adapting AVARDA to other oligonucleotide library will be a future project (unsure when).
 
-Pre-PhIPSeq library generation (Fig. 1) aims to provide an integrated approach to go from protein sequences direcctly to oligonucleotide library such that it can be synthesised and be ready for PhIPSeq experiments. Post-PhIPSeq analysis (Fig. 1) aims to allow a smooth flow from fastq files to read counts data that are ready for down stream analyses. While phippery outputs counts data together with edgeR hits to identify peptides that were significantly occurring above background noise, AVARDA will take the hits data to determine which species have been observed based on the peptide hits. AVARDA also accounts for the potential similarity between peptides that come from organisms with high similarity in their genetics. This in turn allows the determination of whether a species can be uniquely identified as due to existence of peptides that were exclusively from that species. 
-
-### For Mac Users!!!
-For some reason if you're running the pipeline using a Mac computer with a non-intel chip (usually the newer ones like M1 / M2 etc...), the pipeline fails to download the docker / quay.io images. My hunch is that because when the pipeline runs it will try to pull images from repositories with matching architecture. Since all the containers were built with linux as the base image,  as a Mac environment pulling an image, the Mac-based image wouldn't have existed and hence no download occur. This leads to an error saying "Container not found..". One manual way is to download the containers prior to running the pipeline (as in the linux-based containers). This will trigger a warning during run time where nextflow says a specific platform wasn't requested and it identifies a mismatch from local platform vs container platform. It will still run ,but it won't be running at optimal conditions (perhaps some decrease in performance when data is large).
-
-The issue is currently a work in progress. We've had success where `phippery` seems to run quite happily on small data sets. AVARDA still has some issues. Pre-PhIPSEQ component have yet to be tested. 
-
+Pre-PhIPSeq library generation (Fig. 1) aims to provide an integrated approach to go from protein sequences direcctly to oligonucleotide library such that it can be synthesised and be ready for PhIPSeq experiments. Post-PhIPSeq analysis (Fig. 1) aims to allow a smooth flow from fastq files to read counts data that are ready for down stream analyses. While phippery outputs counts data together with edgeR hits to identify peptides that were significantly occurring above background noise, AVARDA will take the hits data to determine which species have been observed based on the peptide hits. AVARDA also accounts for the potential similarity between peptides that come from organisms with high similarity in their genetics. This in turn allows the determination of whether a species can be uniquely identified as due to existence of peptides that were exclusively from that species.
 
 ![Test Image](readme_figures/WookFlow_Illustration.png)
 
@@ -72,9 +66,9 @@ nextflow run /home/shouyu/Preston_VirScan_Nextflow/main.nf \
 
 ```
 
-**Note**: If you want to test the success of the Pre-PhIP-Seq pipeline, you can use the built-in test configuration file. This test configuration file is located in `conf/test.config`. This configuration file uses the virus sequence files located in the `assets/bips_test_data`, `assets/oligo_csv`, `assets/oligo_fa` directories of the project. 
+**Note**: If you want to test the success of the Pre-PhIP-Seq pipeline, you can use the built-in test configuration file. This test configuration file is located in `conf/test.config`. This configuration file uses the virus sequence files located in the `assets/bips_test_data`, `assets/oligo_csv`, `assets/oligo_fa` directories of the project.
 
-Open the `conf/test.config file`, since the test of four modes are commented out, you are required to uncomment them before testing each one. Then, run the pipeline test using the command  
+Open the `conf/test.config file`, since the test of four modes are commented out, you are required to uncomment them before testing each one. Then, run the pipeline test using the command
 ```sh
 nextflow run main.nf -profile test
 ```
@@ -132,20 +126,16 @@ nextflow run ../nf-core-wookflow/main.nf \
 --max_cpus 24 \
 --max_memory '36.GB'
 
-``` 
-
-### AVARDA Data Files
-Due to the size of the files required for AVARDA, they're not included in this repository, but can be downloaded via this [link](https://unsw-my.sharepoint.com/:u:/g/personal/z3251845_ad_unsw_edu_au1/EanUQTNfgIJBptE_YUz8RacBnDphlh7BtjTe7X0YjBIz0Q?e=drKESl). Once downloaded, extract the file into the path: `/subworkflow/local/AVARDA/data/`.   
-
+```
 
 ## Other adjustable Phippery parameters
 
-Default values are shown in square bracers `[]`. 
+Default values are shown in square bracers `[]`.
 
 ```
-# ************************************* 
-# Switching analysis workflows on/off * 
-# ************************************* 
+# *************************************
+# Switching analysis workflows on/off *
+# *************************************
     --run_zscore_fit_predict [true]        # run zscore workflow or not
     --run_cpm_enr_workflow [false]         # run counts per million workflow or not
     --run_edgeR [true]                     # run edgeR or not
@@ -161,34 +151,34 @@ Default values are shown in square bracers `[]`.
 
 # ********************************************
 # Grouping peptides by species or categories *
-# ********************************************    
+# ********************************************
     --summarize_by_organism [true]              # turn on summarise peptide detection by organism
-    --max_overlap [7]                           # Maximum allowed overlap between detected peptides    
-    --zscore_threshold [2.5]                    # Minimum z-score threshold    
+    --max_overlap [7]                           # Maximum allowed overlap between detected peptides
+    --zscore_threshold [2.5]                    # Minimum z-score threshold
     --edgeR_threshold [0.05]                    # Maximum edgeR threshold (BH-adjusted p-value)
     --peptide_org_col [Species]                 # Column in the peptide table indicating the organism for each peptide
     --sample_grouping_col [sample_source]       # Column in the sample table used for mapping replicates to samples
     --peptide_seq_col [Prot]                    # Column in the peptide table containing the peptide sequence (For matching known epitopes & filter overlapping peptides)
-        
-    # Below params are optional to include when summarize_by_organism is switched on.    
-    
+
+    # Below params are optional to include when summarize_by_organism is switched on.
+
     # Directory for storing known epitopes to check alignment with peptides
     # $projectDir is a nextflow variable of where the nextflow project is stored.
     --public_epitopes_csv = [$projectDir/templates/public_epitope_template.csv"]
-    
+
     # Column name containing the translated amino acid sequence for known epitopes
     --public_epitopes_col [peptide_translate]
-        
+
 # **************************
-# Output file type options *  
-# **************************    
+# Output file type options *
+# **************************
     --output_tall_csv [true]              # dish out tall (long) format csv
     --output_pickle_xarray [true]         # Output Xarray pickle (.phip file)
-    --output_wide_csv [true]              # Output wide format ds     
-    
+    --output_wide_csv [true]              # Output wide format ds
+
 # *************************************
 # Output file location options        *
-# *************************************    
+# *************************************
     --results [$PWD/phippery_results]       # setting where to output results to
 
 
@@ -240,44 +230,44 @@ PATH/TO/beads_only_BG5_raw.fastq.gz|beads_only|BG-05|BG|
 
 
 ## AVARDA parameters
-Default values are shown in square bracers `[]`. 
+Default values are shown in square bracers `[]`.
 
 ```
 #############################################################
 # TODO: Describe below input params and also indicate       #
 #       which ones shouldn't really be fiddled with unless  #
-#       you know what you're doing.                         # 
+#       you know what you're doing.                         #
 #############################################################
 
 
 # input 1 - file usually containing binary values of T/F or 1/0 to indicate if peptide was a hit.
     --case_path [$baseDir/subworkflows/local/AVARDA/data/example_input/AVARDA_test_data.tsv.gz]
-    
+
 
 # input 7 - location to place results
     --out_path [$PWD/avarda_results/]
-        
+
 # input 8 - prefix for naming output files
     --out_name [AVARDA_Output_]
 
 
 # ******************************************************************
 # Only change these hard coded files if you know what you're doing *
-* These are all set by authors of AVARDA.                          *
+* These are all set by original authors of AVARDA.                          *
 # ******************************************************************
 
-# input 2 - thershold 1 means input 1 is a binary file. 
+# input 2 - thershold 1 means input 1 is a binary file.
     --threshold [1]
-    
+
 # input 3 - peptide id to peptide id dictionary alignment (if the pair aligned well they are in this list)
     --dict_path [$baseDir/subworkflows/local/AVARDA/data/dict_path/my_df.csv.gz]
 
 # input 4 - Total expected probabilities of species based on VirScan Library
     --total_path [$baseDir/subworkflows/local/AVARDA/data/total_path/total_probability_xr2.csv.gz]
-    
+
 # input 5 - pairwise expected probability of obtaining a species X given species Y.
     --pairwise_path [$baseDir/subworkflows/local/AVARDA/data/pairwise_path/unique_probabilities3.csv.gz]
-    
+
 # input 6 - blast alignment results of all the peptides to species. Values SHOULD BE bitscore
 # but for some reason looks more like percentage identity
     --blast_path [$baseDir/subworkflows/local/AVARDA/data/blast_path/VirScan_filtered_virus_blast_new.csv.gz]
@@ -291,7 +281,7 @@ Default values are shown in square bracers `[]`.
 
 ## Pipeline output
 
-When generating the Pre-PhIPSeq oligonucleotide library, the output will be located at where you've defined  `--outdir` to be. 
+When generating the Pre-PhIPSeq oligonucleotide library, the output will be located at where you've defined  `--outdir` to be.
 
 
 ## Contributors to WookScan
@@ -300,7 +290,7 @@ When generating the Pre-PhIPSeq oligonucleotide library, the output will be loca
  - Preston Leung
  - Bea Delgado-Corrales
  - Legana Fingerhut
- - Shouyu (Coco) Wei 
+ - Shouyu (Coco) Wei
 
 
 We also thank the following people for their extensive assistance in the development of this pipeline:
@@ -342,4 +332,3 @@ For more details and further functionality, please refer to the [usage documenta
 To see the results of an example test run with a full size dataset refer to the [results](https://nf-co.re/wookflow/results) tab on the nf-core website pipeline page.
 For more details about the output files and reports, please refer to the
 [output documentation](https://nf-co.re/wookflow/output).
-
