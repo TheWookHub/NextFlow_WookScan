@@ -8,3 +8,6 @@ testing*
 *.pyc
 fancyTitle.md
 cmd_scribbles.sh
+# unignore AVARDA data files necessary to run AVARDA
+!subworkflows/local/AVARDA/data/
+
