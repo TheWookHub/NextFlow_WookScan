@@ -122,9 +122,16 @@ workflow STATS {
         Channel.empty() | set { edgeR_BEER_ch }
 
     // run some optional statistics which
-    // depend on certain annotations
-    cpm_fold_enrichment(counts_per_million.out) | set { cpm_fold_enr_ch }
-    fit_predict_zscore(counts_per_million.out) | set { fit_pred_zscore_ch }
+    // depend on certain annotations    
+    if(params.run_cpm_enr_workflow)
+        cpm_fold_enrichment(counts_per_million.out) | set { cpm_fold_enr_ch }
+    else
+        Channel.empty() | set { cpm_fold_enr_ch }
+    
+    if(params.run_zscore_fit_predict)
+        fit_predict_zscore(counts_per_million.out) | set { fit_pred_zscore_ch }
+    else
+        Channel.empty() | set { fit_pred_zscore_ch }
 
     // collect all the datasets statistics and merge
     auto_stats_ch.concat(
