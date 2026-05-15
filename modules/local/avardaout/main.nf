@@ -11,8 +11,7 @@ process AVARDAOUT{
         path pairwise_path
         path blast_path
         val out_name
-        path avarda_names
-        val cores
+        path avarda_names        
     output:
         path "*.csv", emit: avarda_outs        
     script:    
@@ -26,6 +25,6 @@ process AVARDAOUT{
         --blast_path $blast_path \
         --out_name $out_name \
         --avarda_names $avarda_names \
-        --cores $cores
+        --cores ${task.cpus}
     """
 }

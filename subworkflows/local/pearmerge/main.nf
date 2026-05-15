@@ -12,9 +12,8 @@ nextflow.enable.dsl=2
 process FASTP_OUT{
     publishDir "$params.results/filtered_fastq/", mode: 'copy', overwrite: true
     //container = 'docker.io/pdawgzgg/avarda_r_env:0.1'
-    tag "${basename}"
     input:
-        tuple val(tech_id),val(basename),path(filename)
+        tuple val(tech_id),val(basename),val(filename), path(file_path)
     output:
         path("*_filtered.fastq.gz"), emit: filteredFqName
         path ("*_filtered.html")
@@ -22,12 +21,12 @@ process FASTP_OUT{
     script:
         """        
         fastp -t 0 \
-        -i "${filename}" \
+        -i "${file_path}" \
         -z 9 \
-        -o "${basename}_filtered.fastq.gz" \
-        -R "${basename}" \
-        -j "${basename}_filtered.json" \
-        -h "${basename}_filtered.html"
+        -o "${basename[0][1]}_filtered.fastq.gz" \
+        -R "${basename[0][1]}" \
+        -j "${basename[0][1]}_filtered.json" \
+        -h "${basename[0][1]}_filtered.html"
         """
 }
 
@@ -67,26 +66,18 @@ process UPDATE_SAMPLE_TABLE{
 
 workflow FASTP_WORKFLOW{
     main:
-        // Check if sample table is not default value. If it is not
-        // we assume that file path for samples is provided by user in sample table
-        // file and we do not add default prefix.
-        // if(params.sample_table != "$baseDir/subworkflows/local/phippery/data/pan-cov-example/sample_table_with_beads_and_lib.csv"){
-        //     curr_reads_prefix = ''
-        // }else{
-        //     curr_reads_prefix = params.reads_prefix
-        // }
         // Take original sample table
         // got to extract the first column that contains all
-        // the fastq file paths and then run fastp.        
+        // the fastq file paths and then run fastp.
         sample_ch = Channel.fromPath(params.sample_table)
         sample_ch
             .splitCsv(header:true)
             .map{ row -> 
                     tuple(
                         row.technical_replicate_id, 
-                        (row.fastq_filepath =~ /.+\/(.+)\.fastq\.gz/)[0][1], // extract the base name of the fastq file
-                        file(row.fastq_filepath) // fastq file path
-                        // file("${curr_reads_prefix}/${row.fastq_filepath}")
+                        row.fastq_filepath =~ /.+\/(.+)\.fastq\.gz/, // extract the base name of the fastq file
+                        row.fastq_filepath, // fastq file path
+                        file("$params.reads_prefix/${row.fastq_filepath}")
                     ) 
                 }
             .set { sample_table_ch }        

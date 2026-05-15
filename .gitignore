@@ -8,6 +8,7 @@ testing*
 *.pyc
 fancyTitle.md
 cmd_scribbles.sh
+nextflow_old.config
 # unignore AVARDA data files necessary to run AVARDA
 !subworkflows/local/AVARDA/data/
 

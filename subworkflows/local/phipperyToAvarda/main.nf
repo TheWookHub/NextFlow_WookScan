@@ -61,16 +61,12 @@ process PHIPOUTPUT_EXTRACT{
         """
 }
 
-
-if(params.run_phippery){
-    upep_prefix_ch = Channel.value(params.user_pep_id)
-}
-
 workflow PHIPPERYTOAVARDA{
     take:
         data_phip_ch
 
-    main:
+    main:        
+        upep_prefix_ch = Channel.value(params.user_pep_id)        
         PHIPOUTPUT(upep_prefix_ch,data_phip_ch)
         PHIPOUTPUT_EXTRACT(data_phip_ch)
     emit:

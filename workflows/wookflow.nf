@@ -4,13 +4,15 @@
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 */
 // include { VIRALDB                } from '../subworkflows/local/viraldb/main.nf'
-include { FASTP_WORKFLOW          } from '../subworkflows/local/fastp/main.nf'
-include { PHIPPERY                } from '../subworkflows/local/phippery/main.nf'
-include { PHIPPERYTOAVARDA        } from '../subworkflows/local/phipperyToAvarda/main.nf'
-include { AVARDA                  } from '../subworkflows/local/AVARDA/main.nf'
+// include { CUTADAPT          } from '../subworkflows/local/cutadapt/main.nf'
+include { FASTP_WORKFLOW    } from '../subworkflows/local/fastp/main.nf'
+// include { PEARMERGE         } from '../subworkflows/local/pearmerge/main.nf'
+include { PHIPPERY          } from '../subworkflows/local/phippery/main.nf'
+include { PHIPPERYTOAVARDA  } from '../subworkflows/local/phipperyToAvarda/main.nf'
+include { AVARDA            } from '../subworkflows/local/AVARDA/main.nf'
 // may remove this later
 // include { POSTAVARDA_WORKFLOW     } from '../subworkflows/local/PostAVARDA/main.nf'
-include { BIPS_THEN_DOLPHYN     } from '../subworkflows/local/bipsThenDolphyn/main.nf'
+include { BIPS_THEN_DOLPHYN } from '../subworkflows/local/bipsThenDolphyn/main.nf'
 
 
 /*
@@ -18,38 +20,78 @@ include { BIPS_THEN_DOLPHYN     } from '../subworkflows/local/bipsThenDolphyn/ma
     RUN MAIN WORKFLOW
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 */
-log.info"""
 
-#################################
-#      Welcome to WookScan      #
-#################################
 
-A custom built PhIPSeq analysis suite. Currently supports:
-    - VirScan
+// HOW TO USE PROFILES TO DO CRAP 
+// FIX THIS NF FILE TO THIS FORMAT
 
-Contributors:
-    - Preston (preston@unsw.edu.au)
-    - Bea (b.delgado_corrales@unsw.edu.au)
-    - Legana (l.fingerhut@unsw.edu.au)
-    - Shouyu (Coco) Wei (shouyu.wei@student.unsw.edu.au)
+// include { SUB_A } from './subworkflows/analysis_a'
+// include { SUB_B } from './subworkflows/analysis_b'
 
-"""
+// workflow {
+//     // 1. Get a list of active profiles
+//     def active_profiles = workflow.profile.tokenize(',')
+
+//     // 2. Conditional logic to run subworkflows
+//     if ( active_profiles.contains('analysis_a') ) {
+//         SUB_A(ch_input)
+//     } 
+    
+//     if ( active_profiles.contains('analysis_b') ) {
+//         SUB_B(ch_input)
+//     }
+// }
+
 
 
 workflow WOOKFLOW {
 
     // take:
     // ch_samplesheet 
-    // channel: samplesheet read in from --input
-    log.info "[WORKFLOW] Starting main workflow..."
-    log.info "[WORKFLOW] BIPS/Dolphyn mode: ${params.mode ?: 'not set'}"
-    log.info "[WORKFLOW] Run Phippery flag: ${params.run_phippery}"
-    log.info "[WORKFLOW] Run AVARDA flag: ${params.run_AVARDA}"
+    // channel: samplesheet read in from --input    
 
     main:
-    // ========================================================================================
-    //      PRE-PHIP-SEQ: BIPS/DOLPHYN MODULE LOGIC
-    // ========================================================================================
+    
+    log.info"""
+
+        #################################
+        #      Welcome to WookScan      #
+        #################################
+
+        A custom built PhIPSeq analysis suite. Currently supports:
+            - VirScan
+
+        Contributors:
+            - Preston (preston@unsw.edu.au)
+            - Bea (b.delgado_corrales@unsw.edu.au)
+            - Legana (l.fingerhut@unsw.edu.au)
+            - Shouyu (Coco) Wei (shouyu.wei@student.unsw.edu.au)
+
+    """
+
+
+
+    def active_profiles = workflow.profile.tokenize(',')
+    // Some profile checks to avoid conflicting / incompatible profiles
+    if (active_profiles.contains('virscan') && active_profiles.contains('avarda') ) {
+        error "CRITICAL ERROR: Profile 'virscan' includes 'avarda' as an option. Please add '--run_AVARDA true' in command line params and remove 'avarda' from the profile param."
+    }
+    if (active_profiles.contains('huscan') && active_profiles.contains('avarda')) {
+        error "CRITICAL ERROR: Profile 'huscan' is not compatible with avarda tool. Please omit 'avarda' when specifying profiles in command line params."
+    }    
+    if ( active_profiles.contains('virscan') && active_profiles.contains('huscan') ) {
+        error "CRITICAL ERROR: Profiles 'virscan' and 'huscan' are mutually exclusive. Please choose only one."
+    }
+    
+    log.info "[WORKFLOW] Profile checks completed: Starting main workflow!"
+    log.info "[WORKFLOW] Profiles: ${active_profiles}"
+    // log.info "[WORKFLOW] BIPS/Dolphyn mode: ${params.mode ?: 'not set'}"
+    // log.info "[WORKFLOW] Run Phippery flag: ${params.run_phippery}"
+    // log.info "[WORKFLOW] Run AVARDA flag: ${params.run_AVARDA}"
+    
+    // ==============================================================================================
+    //      PRE-PHIP-SEQ: BIPS/DOLPHYN MODULE LOGIC - NEED TO REWORK THIS LATER TO FIT INTO PROFILES
+    // ==============================================================================================
     if (params.mode == "bips_then_dolphyn" || params.mode == "bips_only" || params.mode == "dolphyn_standalone" || params.mode == "dolphyn_oligo_only") {
         log.info "[WORKFLOW] Entering BIPS/Dolphyn branch based on mode: '${params.mode}'"
 
@@ -224,21 +266,19 @@ workflow WOOKFLOW {
                 helper_script_path_obj
             )
         }
-    }
-    
+    }   
+
     // ========================================================================================
     //      POST-PHIP-SEQ: PHIPPERY/AVARDA MODULE LOGIC
-    // ========================================================================================
-
-    //
-    // RUN: ViralDB - Build Viral Library support files for AVARDA        
-    // TODO   
+    // ========================================================================================    
     
-    // Print out the message for running phippert    
-    if(params.run_phippery){        
+    // VirScan mode: run Phippery and AVARDA (optional) with custom WookScan modifications
+    if(params.runtype == 'virscan'){        
+        // Print out the message for running phippery            
         log.info """
             --------------------------------------
             WookScan uses: P H I P - F L O W!
+            Runtype         : $params.runtype
             --------------------------------------            
             Phippery & phip-flow is developed by:
             -   Matsen, Overbaugh, and Minot Labs
@@ -247,9 +287,7 @@ workflow WOOKFLOW {
             -   https://github.com/matsengrp/phip-flow            
             ================================
             sample_table    : $params.sample_table
-            peptide_table   : $params.peptide_table
-            results         : $params.results
-            reads_prefix    : $params.reads_prefix
+            peptide_table   : $params.peptide_table            
             publishDir      : $params.results
             
             --------------------------------------
@@ -262,15 +300,13 @@ workflow WOOKFLOW {
             publishDir      : $params.results
 
         """.stripIndent()        
-    }
-    
-    // Print out message for AVARDA with/without PHIPPERY messages    
-    if(params.run_AVARDA){        
-        if(params.run_phippery){
+        
+        if(params.run_AVARDA){ 
             // If we take stuff directly from phippery output
             log.info """
             --------------------------------------
-            WookScan uses: AVARDA: PHIPPERY-AVARDA
+            WookScan uses   : AVARDA: PHIPPERY-AVARDA
+            Runtype         : $params.runtype
             --------------------------------------
             AVARDA is developed by:
             -   Monaco et al.
@@ -279,56 +315,83 @@ workflow WOOKFLOW {
             Modification performed by:
             -   Preston Leung
             ================================
-            virlib      : From PHIPPERYTOAVARDA.out.virlib
-            edgeRhits   : From PHIPPERYTOAVARDA.out.edgeRhits
-            publishDir  : $params.out_path
+            virlib          : From PHIPPERYTOAVARDA.out.virlib
+            edgeRhits       : From PHIPPERYTOAVARDA.out.edgeRhits
+            publishDir      : $params.out_path
             
-            """.stripIndent()            
-        }else{
-            // We're running AVARDA by itself
-            log.info """
-            --------------------------------------
-            WookScan uses: AVARDA: AVARDA ONLY
-            --------------------------------------
-            AVARDA is developed by:
-            -   Monaco et al.
-            Modification performed by:
-            -   Preston Leung
-            ================================
-            virlib      : $params.avarda_names
-            edgeRhits   : $params.case_path
-            publishDir  : $params.out_path
-
             """.stripIndent()
-            
         }
-    }
-    
-    if(params.run_phippery){
+        
         // Running Fastp -> Phippery
         if(params.run_fastp){            
             FASTP_WORKFLOW()
             PHIPPERY(FASTP_WORKFLOW.out)
+        
         // Omits Fastp. Assumes fastqs are already trimmed / filtered 
         }else{            
             PHIPPERY(Channel.fromPath(params.sample_table))
         }
-        // PHIPPERY()        
-        PHIPPERYTOAVARDA(PHIPPERY.out)
-    }
-    // Running AVARDA
-    if(params.run_AVARDA){ 
-        if(params.run_phippery){
+        // If params.run_AVARDA was switched on by user, then we run AVARDA 
+        // using the outputs from PHIPPERYTOAVARDA. If not, we skip AVARDA 
+        if(params.run_AVARDA){
+            PHIPPERYTOAVARDA(PHIPPERY.out)
             virlib = PHIPPERYTOAVARDA.out.virlib
             edgeRhits = PHIPPERYTOAVARDA.out.edgeRhits
-        }else{
-            virlib = Channel.fromPath(params.avarda_names)
-            edgeRhits =  Channel.fromPath(params.case_path)        
-        }        
+            AVARDA(virlib, edgeRhits)
+        }
+    
+
+    // AVARDA only mode (for VirScan): run AVARDA using user-provided virlib and edgeRhits files, with custom WookScan modifications
+    // NO PHIPPERY INVOLVED HERE. USER PROVIDES THEIR OWN VIRLIB AND EDGERHITS, WHICH MAY OR MAY NOT BE DERIVED FROM PHIPPERY OUTPUT
+    }else if(params.runtype == 'avarda'){
+        // We're running AVARDA by itself
+        log.info """
+        --------------------------------------
+        WookScan uses   : AVARDA - AVARDA ONLY
+        Runtype         : virscan (but AVARDA only)
+        --------------------------------------
+        AVARDA is developed by:
+        -   Monaco et al.
+        Modification performed by:
+        -   Preston Leung
+        ================================
+        virlib          : $params.avarda_names
+        edgeRhits       : $params.case_path
+        publishDir      : $params.out_path
+
+        """.stripIndent()
+        
+        virlib = Channel.fromPath(params.avarda_names)        
+        edgeRhits =  Channel.fromPath(params.case_path)
         AVARDA(virlib, edgeRhits)
-        // probably don't need this anymore since the sample names are correclty labeled in the AVARDA output
-        // POSTAVARDA_WORKFLOW() 
-    }
+    // HuScan mode: run cutadapt, phippery, and skip AVARDA (incompatible with HuScan), with custom WookScan modifications
+    }else if(params.runtype == 'huscan'){
+        println "Running HuScan workflow: cutadapt -> phippery (no AVARDA, incompatible with HuScan) WIP - CURRENTLY DO NOTHING"
+        // Running Fastp -> Phippery
+        // if(params.run_fastp){
+        //     CUTADAPT_WORKFLOW() // Trim the adapters from 5' end in the fastq files
+        //     view(CUTADAPT_WORKFLOW.out)
+        //     FASTP_WORKFLOW(CUTADAPT_WORKFLOW.out) // Filter the fastq files
+        //     PEARMERGE_WORKFLOW(FASTP_WORKFLOW.out) // Merge the paired end reads into single reads
+        //     PHIPPERY(PEARMERGE_WORKFLOW.out) // Run Phippery on the merged reads
+        // Omits Fastp. Assumes fastqs are already trimmed / filtered 
+        // }else{            
+        //     PHIPPERY(Channel.fromPath(params.sample_table))
+        // }
+        // // PHIPPERY()        
+        // PHIPPERYTOAVARDA(PHIPPERY.out)
+        
+    }        
+    
+    // THIS IS WHERE HUSCAN WORKFLOW COULD BRANCH OUT TO DIFFERENT PROCESSES BASED ON FLAGS       
+    // SOMEWHERE HERE AT LEAST
+    // TODO:
+    // We need to figure out if we are performing a VirScan or a HuScan run.
+    // Next if it is VirScan, we will proceed as old school. If its HuScan then we need
+    // to make it run cutadapt, then fastp, then pear merge and bowtie 2.
+
+  
+    
 
 }
 
