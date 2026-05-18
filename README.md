@@ -81,11 +81,13 @@ Two main files that are required for Phippery component is the `--sample_table` 
 General phippery runs assume fastq files are already trimmed and filtered. You can optionally give the raw fastq files to wookflow and then turn `--run_fastp True` in the parameters and Wookflow will run them through fastp. To specify the path of fastq files edit it in the `.csv` file for `--sample_table` input.
 
 ```
-# Running Phippery Only #
+####################
+# Profile: VirScan #
+####################
 
+# Running Phippery Only #
 nextflow run /home/preston/PhIPSeq-Pipelines/nf-core-wookflow/main.nf \
---run_phippery True \
--profile docker \
+-profile virscan \
 --peptide_table InputFiles/peptide_table_VIR3_full_v7.csv \
 --sample_table InputFiles/sample_table_UNSW_VirScan.csv \
 --run_cpm_enr_workflow true \
@@ -95,11 +97,9 @@ nextflow run /home/preston/PhIPSeq-Pipelines/nf-core-wookflow/main.nf \
 --dataset_prefix "data"
 
 # Running Phippery & AVARDA #
-
 nextflow run ../nf-core-wookflow/main.nf \
---run_phippery True \
 --run_AVARDA True \
--profile docker \
+-profile virscan \
 --peptide_table InputFiles/peptide_table_VIR3_full_v7.csv \
 --sample_table InputFiles/sample_table_UNSW_VirScan.csv \
 --run_cpm_enr_workflow True \
@@ -110,15 +110,14 @@ nextflow run ../nf-core-wookflow/main.nf \
 --out_name PHIPAVARDA \
 --max_cpus 24 \
 --max_memory '36.GB' \
---run_fastp True
+--run_fastp True 
 
 
 # Running Only AVARDA (assumes you have some hits data) #
 # Note: AVARDA only works for VirScan Library for now.
 
 nextflow run ../nf-core-wookflow/main.nf \
---run_AVARDA True \
--profile docker \
+-profile avarda \
 --case_path ../nf-core-wookflow/subworkflows/local/AVARDA/data/example_input/AVARDA_test_data.tsv.gz \
 --avarda_names ../nf-core-wookflow/subworkflows/local/AVARDA/data/avarda_names/avarda_names.csv.gz
 --out_path ../WookScanNextFlowTest2/TestWookFlow2_AVARDA \
@@ -253,7 +252,7 @@ Default values are shown in square bracers `[]`.
 
 # ******************************************************************
 # Only change these hard coded files if you know what you're doing *
-* These are all set by original authors of AVARDA.                          *
+* These are all hardcoded by original authors of AVARDA.           *
 # ******************************************************************
 
 # input 2 - thershold 1 means input 1 is a binary file.
