@@ -72,11 +72,21 @@ workflow WOOKFLOW {
 
 
     def active_profiles = workflow.profile.tokenize(',')
-    // Some profile checks to avoid conflicting / incompatible profiles
-    if (active_profiles.contains('virscan') && active_profiles.contains('avarda') ) {
-        error "CRITICAL ERROR: Profile 'virscan' includes 'avarda' as an option. Please add '--run_AVARDA true' in command line params and remove 'avarda' from the profile param."
+    def defined_profiles = [
+        'virscan', 'huscan', 'avarda_only',
+        'standard', 'debug','conda',
+        'docker','singularity','arm',
+        'test','test_full'
+    ]
+    def invalid_profiles = active_profiles - defined_profiles
+    if(invalid_profiles.size() > 0) {
+        error "CRITICAL ERROR: Invalid profile(s) specified: ${invalid_profiles}. Please check your command line parameters and ensure all profiles are valid."
     }
-    if (active_profiles.contains('huscan') && active_profiles.contains('avarda')) {
+    // Some profile checks to avoid conflicting / incompatible profiles
+    if (active_profiles.contains('virscan') && active_profiles.contains('avarda_only') ) {
+        error "CRITICAL ERROR: Profile 'virscan' includes 'avarda_only' as an option. Please add '--run_AVARDA true' in command line params and remove 'avarda_only' from the profile param."
+    }
+    if (active_profiles.contains('huscan') && active_profiles.contains('avarda_only')) {
         error "CRITICAL ERROR: Profile 'huscan' is not compatible with avarda tool. Please omit 'avarda' when specifying profiles in command line params."
     }    
     if ( active_profiles.contains('virscan') && active_profiles.contains('huscan') ) {
@@ -343,7 +353,7 @@ workflow WOOKFLOW {
 
     // AVARDA only mode (for VirScan): run AVARDA using user-provided virlib and edgeRhits files, with custom WookScan modifications
     // NO PHIPPERY INVOLVED HERE. USER PROVIDES THEIR OWN VIRLIB AND EDGERHITS, WHICH MAY OR MAY NOT BE DERIVED FROM PHIPPERY OUTPUT
-    }else if(params.runtype == 'avarda'){
+    }else if(params.runtype == 'avarda_only'){
         // We're running AVARDA by itself
         log.info """
         --------------------------------------
