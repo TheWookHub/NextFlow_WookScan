@@ -117,7 +117,7 @@ nextflow run ../nf-core-wookflow/main.nf \
 # Note: AVARDA only works for VirScan Library for now.
 
 nextflow run ../nf-core-wookflow/main.nf \
--profile avarda \
+-profile avarda_only \
 --case_path ../nf-core-wookflow/subworkflows/local/AVARDA/data/example_input/AVARDA_test_data.tsv.gz \
 --avarda_names ../nf-core-wookflow/subworkflows/local/AVARDA/data/avarda_names/avarda_names.csv.gz
 --out_path ../WookScanNextFlowTest2/TestWookFlow2_AVARDA \
