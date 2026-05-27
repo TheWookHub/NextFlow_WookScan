@@ -98,7 +98,7 @@ nextflow run /home/preston/PhIPSeq-Pipelines/nf-core-wookflow/main.nf \
 
 # Running Phippery & AVARDA #
 nextflow run ../nf-core-wookflow/main.nf \
---run_AVARDA True \
+--run_AVARDA true \
 -profile virscan \
 --peptide_table InputFiles/peptide_table_VIR3_full_v7.csv \
 --sample_table InputFiles/sample_table_UNSW_VirScan.csv \
@@ -110,7 +110,7 @@ nextflow run ../nf-core-wookflow/main.nf \
 --out_name PHIPAVARDA \
 --max_cpus 24 \
 --max_memory '36.GB' \
---run_fastp True 
+--run_fastp true 
 
 
 # Running Only AVARDA (assumes you have some hits data) #
