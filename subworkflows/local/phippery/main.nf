@@ -69,6 +69,7 @@ workflow PHIPPERY {
         filtered_sample_table_ch    
     
     main:
+    // ALIGN(filtered_sample_table_ch) // For testing HuScan Integration
     ALIGN(filtered_sample_table_ch) | STATS | DSOUT | AGG     
         // original flow
     // ALIGN | STATS | DSOUT | AGG

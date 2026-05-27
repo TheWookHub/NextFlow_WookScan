@@ -9,38 +9,36 @@
 nextflow.enable.dsl=2
 
 // process FASTP_OUT is to take in the fastq 
-process FASTP_OUT{
-    publishDir "$params.results/filtered_fastq/", mode: 'copy', overwrite: true
-    //container = 'docker.io/pdawgzgg/avarda_r_env:0.1'
+process PEAR_OUT{
+    tag "${basename}"
+    publishDir "$params.results/merged_fastq/", mode: 'copy', overwrite: true    
     input:
-        tuple val(tech_id),val(basename),val(filename), path(file_path)
+        tuple path(filename_r1),path(filename_r2), val(basename)
     output:
-        path("*_filtered.fastq.gz"), emit: filteredFqName
-        path ("*_filtered.html")
+        path("*.assembled.fastq.gz"), emit: mergedFqName        
         
     script:
-        """        
-        fastp -t 0 \
-        -i "${file_path}" \
-        -z 9 \
-        -o "${basename[0][1]}_filtered.fastq.gz" \
-        -R "${basename[0][1]}" \
-        -j "${basename[0][1]}_filtered.json" \
-        -h "${basename[0][1]}_filtered.html"
+        """
+        pear --threads ${task.cpus} \
+        -f ${filename_r1} \
+        -r ${filename_r2} \
+        -o ${basename}; \
+        gzip -9 -c ${basename}.assembled.fastq > ${basename}.assembled.fastq.gz; \
+
         """
 }
 
-process UNRAVEL_FILTERED_NAMES{
-    publishDir "$params.results/filtered_fastq/", mode: 'copy', overwrite: true
+process UNRAVEL_ASSEMBLED_NAMES{    
+    publishDir "$params.results/merged_fastq/", mode: 'copy', overwrite: true
     input:
-        val filtered_fastq_list
+        val assembled_fastq_list
     output:
-        path "filtered_names_collection.txt", emit: filtered_names_collection
+        path "assembled_names_collection.txt", emit: assembled_names_collection
     script:
         """
-        for item in ${filtered_fastq_list.join(' ')}; 
+        for item in ${assembled_fastq_list.join(' ')}; 
         do            
-            echo "\$item" >> filtered_names_collection.txt
+            echo "\$item" >> assembled_names_collection.txt
         done
 
         """
@@ -48,48 +46,42 @@ process UNRAVEL_FILTERED_NAMES{
 
 // process UPDATE_SAMPLE_TABLE is to update the sample table with the filtered fastq file names
 process UPDATE_SAMPLE_TABLE{
-    // publishDir "$params.results/filtered_fastq/", mode: 'copy', overwrite: true
+    publishDir "$params.results/merged_fastq/", mode: 'copy', overwrite: true
     input:
-        path filtered_fastq_list
+        path assembled_fastq_list
         path sample_table        
     output:
-        path "filtered_sample_table.csv", emit: filtered_table
+        path "assembled_sample_table.csv", emit: assembled_table
     script:
         """
-        update_sample_table.py \
+        update_sample_table_huscan.py \
         -s ${sample_table} \
-        -t ${filtered_fastq_list} \
-        -r ${params.results}/filtered_fastq \
-        -o "filtered_sample_table.csv"
+        -t ${assembled_fastq_list} \
+        -r ${params.results}/merged_fastq \
+        -o "assembled_sample_table.csv" \
+        -m 'assembled'
         """
 }
 
-workflow FASTP_WORKFLOW{
-    main:
-        // Take original sample table
-        // got to extract the first column that contains all
-        // the fastq file paths and then run fastp.
-        sample_ch = Channel.fromPath(params.sample_table)
+workflow PEARMERGE_WORKFLOW{
+    take:
         sample_ch
-            .splitCsv(header:true)
+    main:        
+        println "Running PEARMERGE_WORKFLOW in huscan mode."            
+            sample_ch.splitCsv(header:true)
             .map{ row -> 
                     tuple(
-                        row.technical_replicate_id, 
-                        row.fastq_filepath =~ /.+\/(.+)\.fastq\.gz/, // extract the base name of the fastq file
-                        row.fastq_filepath, // fastq file path
-                        file("$params.reads_prefix/${row.fastq_filepath}")
-                    ) 
+                        file(row.fastq_filepath), // fastq file path for r1                        
+                        file(row.fastq_filepath2), // fastq file path for r2
+                        (row.fastq_filepath =~ /.+\/(.+)_R1_001_filtered\.fastq\.gz/)[0][1] // extract the base name
+                    )                    
                 }
-            .set { sample_table_ch }        
-        
-        // Run fastp for quality check and then collect the new filtered fastq
-        // file names. After that alter the original sample table so the fastq file paths
-        // are pointing to the new filtered fastq files.        
-        FASTP_OUT(sample_table_ch)         
-        UNRAVEL_FILTERED_NAMES(FASTP_OUT.out.filteredFqName.toList())
-        UNRAVEL_FILTERED_NAMES.out.filtered_names_collection.set{collection_ch}
-        UPDATE_SAMPLE_TABLE(collection_ch,sample_ch)        
+            .set { sample_table_ch }
+        // sample_ch.view()
+        PEAR_OUT(sample_table_ch)        
+        UNRAVEL_ASSEMBLED_NAMES(PEAR_OUT.out.mergedFqName.toList())
+        UPDATE_SAMPLE_TABLE(UNRAVEL_ASSEMBLED_NAMES.out.assembled_names_collection, sample_ch)
     emit:
-        sample_info = UPDATE_SAMPLE_TABLE.out.filtered_table
+        sample_info = UPDATE_SAMPLE_TABLE.out.assembled_table
 }
 

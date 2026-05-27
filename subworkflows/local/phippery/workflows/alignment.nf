@@ -56,6 +56,16 @@ process generate_index {
     template "generate_index.sh"
 }
 
+// GENERATE INDEX WITH BOWTIE2
+process generate_index2 {
+    input:
+    path "oligo_fasta"
+    output:
+    tuple val("peptide_ref"), path("peptide_index")
+    shell:    
+    template "generate_index2.sh"
+}
+
 // ALIGN ALL SAMPLES TO THE REFERENCE
 process short_read_alignment {
     label 'alignment_tool'
@@ -65,6 +75,18 @@ process short_read_alignment {
     tuple val(sample_id), path("${sample_id}.sam")
     shell:
     template "short_read_alignment.sh"
+
+}
+
+// ALIGN ALL SAMPLES TO REFERENCE BUT WITH BOWTIE2
+process short_read_alignment2 {
+    label 'alignment_tool'
+    input:
+    tuple val(sample_id), path(index), path(respective_replicate_path)
+    output:
+    tuple val(sample_id), path("${sample_id}.sam")
+    shell:
+    template "short_read_alignment_2.sh"
 
 }
 
@@ -128,25 +150,49 @@ workflow ALIGN {
     main:
         // sample_ch = Channel.fromPath(params.sample_table)
         sample_ch = checked_sample_table_ch
-        peptide_ch = Channel.fromPath(params.peptide_table)        
+        peptide_ch = Channel.fromPath(params.peptide_table)
+        validate_sample_table(sample_ch)        
 
-        validate_sample_table(sample_ch)
-        validate_peptide_table(peptide_ch) \
-            | generate_fasta_reference | generate_index
-
-        validate_sample_table.out.view()
-            .splitCsv(header:true )
-            .map{ row -> 
-                tuple(
-                    "peptide_ref",
-                    row.sample_id,
-                    // file("$params.reads_prefix/$row.fastq_filepath") # don't need prefix here
-                    file("$row.fastq_filepath") // this is sufficient for filtered
-                ) 
-            }.set { samples_ch }
-
-        short_read_alignment(
-            generate_index.out
+        if(params.runtype == 'virscan'){
+            validate_peptide_table(peptide_ch) | generate_fasta_reference | generate_index
+            validate_sample_table.out.view()
+                .splitCsv(header:true )
+                .map{ row -> 
+                    tuple(
+                        "peptide_ref",
+                        row.sample_id,
+                        // file("$params.reads_prefix/$row.fastq_filepath") # don't need prefix here
+                        file("$row.fastq_filepath") // this is sufficient for filtered
+                    ) 
+                }.set { samples_ch }
+            
+            short_read_alignment(
+                generate_index.out
+                    .cross(samples_ch)
+                    .map{ ref, sample ->
+                        tuple(
+                            sample[1],          // sample_id
+                            file(ref[1]),       // index files
+                            file(sample[2]),    // sample path
+                        )
+                    }
+                ) | (sam_to_counts & sam_to_stats)
+        }else if(params.runtype == 'huscan'){
+            
+            validate_peptide_table(peptide_ch) | generate_fasta_reference | generate_index2
+            validate_sample_table.out.view()
+                .splitCsv(header:true )
+                .map{ row -> 
+                    tuple(
+                        "peptide_ref",
+                        row.sample_id,
+                        // file("$params.reads_prefix/$row.fastq_filepath") # don't need prefix here
+                        file("$row.fastq_filepath") // this is sufficient for filtered
+                    ) 
+                }.set { samples_ch }
+            samples_ch.view()
+            short_read_alignment2(
+            generate_index2.out
                 .cross(samples_ch)
                 .map{ ref, sample ->
                     tuple(
@@ -155,7 +201,10 @@ workflow ALIGN {
                         file(sample[2]),    // sample path
                     )
                 }
-        ) | (sam_to_counts & sam_to_stats)
+            )
+            // ) | (sam_to_counts & sam_to_stats)
+        }
+        
 
         ds = collect_phip_data(
             sam_to_counts.out.toSortedList(),
