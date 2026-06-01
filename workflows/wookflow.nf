@@ -340,12 +340,12 @@ workflow WOOKFLOW {
         }else{            
             PHIPPERY(sample_ch)
         }
+        PHIPPERYTOAVARDA(PHIPPERY.out)
+        virlib = PHIPPERYTOAVARDA.out.virlib
+        edgeRhits = PHIPPERYTOAVARDA.out.edgeRhits
         // If params.run_AVARDA was switched on by user, then we run AVARDA 
         // using the outputs from PHIPPERYTOAVARDA. If not, we skip AVARDA 
-        if(params.run_AVARDA.toString().toBoolean()){
-            PHIPPERYTOAVARDA(PHIPPERY.out)
-            virlib = PHIPPERYTOAVARDA.out.virlib
-            edgeRhits = PHIPPERYTOAVARDA.out.edgeRhits
+        if(params.run_AVARDA.toString().toBoolean()){            
             AVARDA(virlib, edgeRhits)
         }
     
