@@ -202,10 +202,14 @@ workflow ALIGN {
                     )
                 }
             )
+            // reminder to self below line was commented out for testing HuScan Integration
+            // a hard block to stop from moving forward.            
             // ) | (sam_to_counts & sam_to_stats)
         }
         
-
+        // From here on to the emit stage, comment out when testing HuScan Integration
+        // because we want to stop here. If it is uncommented, it is because
+        // I am allowing the flow to continue to the end of the pipeline if running VirScan.
         ds = collect_phip_data(
             sam_to_counts.out.toSortedList(),
             sam_to_stats.out.toSortedList(),
