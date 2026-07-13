@@ -151,7 +151,7 @@ Default values are shown in square bracers `[]`.
 # ********************************************
 # Grouping peptides by species or categories *
 # ********************************************
-    --summarize_by_organism [true]              # turn on summarise peptide detection by organism
+    --summarize_by_organism [false]              # turn on summarise peptide detection by organism
     --max_overlap [7]                           # Maximum allowed overlap between detected peptides
     --zscore_threshold [2.5]                    # Minimum z-score threshold
     --edgeR_threshold [0.05]                    # Maximum edgeR threshold (BH-adjusted p-value)
