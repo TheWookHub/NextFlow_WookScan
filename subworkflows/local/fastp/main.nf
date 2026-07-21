@@ -16,8 +16,12 @@ process FASTP_OUT{
     
     input:
         tuple val(tech_id),val(basename),path(filename)
-    output:
-        path("*_filtered.fastq.gz"), emit: filteredFqName
+    output:        
+        tuple val(tech_id),
+              val(basename),
+              path("${basename}_filtered.fastq.gz"),
+              emit: filteredTuple
+        //path("*_filtered.fastq.gz"), emit: filteredFqName
         path ("*_filtered.html")
         
     script:
@@ -38,9 +42,18 @@ process FASTP_OUT_PE{
     input:
         tuple val(tech_id),val(basename_r1),path(filename_r1),val(basename_r2),path(filename_r2), val(basename)
     output:
-        path("*_filtered.fastq.gz"), emit: filteredFqName
-        path ("*_filtered.html")
-        
+        // path("*_filtered.fastq.gz"), emit: filteredFqName
+        // path ("*_filtered.html")
+        // This outputs the filtered fastq in pairs within a tuple list channel
+        // Each element in the tuple list looks like:
+        // [basename, filtered_fastq_r1_path, filtered_fastq_r2_path]
+        tuple( 
+            val(basename), 
+            path("${basename_r1}_filtered.fastq.gz"), 
+            path("${basename_r2}_filtered.fastq.gz"), 
+            emit: filteredFqName
+        )
+        path("${basename}_filtered.html")
     script:
         """                
         fastp \
@@ -62,12 +75,9 @@ process UNRAVEL_FILTERED_NAMES{
         val filtered_fastq_list
     output:
         path "filtered_names_collection.txt", emit: filtered_names_collection
-    script:
-        """
-        for item in ${filtered_fastq_list.join(' ')}; 
-        do            
-            echo "\$item" >> filtered_names_collection.txt
-        done
+    script:        
+        """        
+        printf '%s\n' ${filtered_fastq_list.collect { "'${it}'" }.join(' ')} > filtered_names_collection.txt
 
         """
 }
@@ -79,14 +89,17 @@ process UNRAVEL_FILTERED_NAMES_PE{
     output:
         path "filtered_names_collection.tsv", emit: filtered_names_collection
     script:
+        def rows = filtered_fastq_list
+        def text = rows.collect { row -> "${row[1].name}\t${row[2].name}"}.join('\n')
         """
-        echo ${filtered_fastq_list} | \
-        grep -o '/[^ ]*fastq.gz' | \
-        awk '/_R1_/ {r1=\$0} /_R2_/ {print r1 "\t" \$0}' > filtered_names_collection.tsv
-
+        cat <<EOF > filtered_names_collection.tsv
+        ${text}
+        EOF
         """
 }
-
+        // echo ${filtered_fastq_list} | \
+        // grep -o '/[^ ]*fastq.gz' | \
+        // awk '/_R1_/ {r1=\$0} /_R2_/ {print r1 "\t" \$0}' > filtered_names_collection.tsv
 // process UPDATE_SAMPLE_TABLE is to update the sample table with the filtered fastq file names
 process UPDATE_SAMPLE_TABLE{    
     publishDir "$params.results/filtered_fastq/", mode: 'copy', overwrite: true
@@ -156,11 +169,20 @@ workflow FASTP_WORKFLOW{
             // Run fastp for quality check and then collect the new filtered fastq
             // file names. After that alter the original sample table so the fastq file paths
             // are pointing to the new filtered fastq files.
-            FASTP_OUT(sample_table_ch)
-            UNRAVEL_FILTERED_NAMES(FASTP_OUT.out.filteredFqName.toList())
-            UNRAVEL_FILTERED_NAMES.out.filtered_names_collection.set{collection_ch}
+            FASTP_OUT(sample_table_ch)            
+            FASTP_OUT.out.filteredTuple
+                .toList()
+                .map{rows -> rows.sort{it[0]}.collect { it[2].name }}
+                .set{filtered_fastq_list_ch}
+            FASTP_OUT.out.filteredTuple.set{final_filtered_tuple_ch}
+            
+            UNRAVEL_FILTERED_NAMES(filtered_fastq_list_ch)
+            UNRAVEL_FILTERED_NAMES.out.filtered_names_collection
+                .set{collection_ch}
+            
             UPDATE_SAMPLE_TABLE(collection_ch,sample_ch)
-            final_filtered_table_ch = UPDATE_SAMPLE_TABLE.out.filtered_table
+            UPDATE_SAMPLE_TABLE.out.filtered_table
+                .set{final_filtered_table_ch}            
         }else if(params.runtype == "huscan"){
             println "Running FASTP_WORKFLOW in huscan mode."
             sample_ch
@@ -177,12 +199,30 @@ workflow FASTP_WORKFLOW{
                 }
             .set { sample_table_ch }            
             FASTP_OUT_PE(sample_table_ch)
-            UNRAVEL_FILTERED_NAMES_PE(FASTP_OUT_PE.out.filteredFqName.toList())
+
+            // toList makes the thing into a single list object not a stream of stuff (e.g. tuple)
+            //UNRAVEL_FILTERED_NAMES_PE(FASTP_OUT_PE.out.filteredFqName.toList())            
+            UNRAVEL_FILTERED_NAMES_PE(
+                FASTP_OUT_PE.out.filteredFqName.toList().map{
+                    rows -> rows.sort { a, b -> a[0] <=> b[0] } // customised comparator to tell how you want to sortt
+                }
+            )
+            //UNRAVEL_FILTERED_NAMES_PE(FASTP_OUT_PE.out.filteredFqName.toList())
             UNRAVEL_FILTERED_NAMES_PE.out.filtered_names_collection.set{collection_ch}
             UPDATE_SAMPLE_TABLE_PE(collection_ch,sample_ch)
             final_filtered_table_ch = UPDATE_SAMPLE_TABLE_PE.out.filtered_table
         }        
     emit:
-        final_filtered_table_ch
+        // reminder to self
+        // final_filtered_tuple_ch contains tuple that stores something like this:
+        // [technical_replicate_id, base_name, fastq_filepath]
+        // [BG_8, 1_XXX_8-WEGTY_S8_L001_R1_001, PATH/TO/1_XXX_8-WEGTY_S8_L001_R1_001_filtered.fastq.gz]
+        filtered_tuple = final_filtered_tuple_ch 
+
+        // this stores the filtered sample table csv which contains columns that look like:
+        // fastq_filepath | control_status | technical_replicate_id | sample_source | sample_status
+        // This is to be used as meta data for joining later as well as user readable file. 
+        // Not to be use as direct input.
+        filtered_info = final_filtered_table_ch
 }
 

@@ -67,7 +67,7 @@ process generate_index2 {
 }
 
 // ALIGN ALL SAMPLES TO THE REFERENCE
-process short_read_alignment {
+process short_read_alignment {    
     label 'alignment_tool'
     input:
     tuple val(sample_id), path(index), path(respective_replicate_path)
@@ -147,6 +147,7 @@ process replicate_counts {
 workflow ALIGN {
     take:
         checked_sample_table_ch
+        checked_tuple_ch        
     main:
         // sample_ch = Channel.fromPath(params.sample_table)
         sample_ch = checked_sample_table_ch
@@ -155,17 +156,34 @@ workflow ALIGN {
 
         if(params.runtype == 'virscan'){
             validate_peptide_table(peptide_ch) | generate_fasta_reference | generate_index
-            validate_sample_table.out.view()
-                .splitCsv(header:true )
-                .map{ row -> 
-                    tuple(
-                        "peptide_ref",
-                        row.sample_id,
-                        // file("$params.reads_prefix/$row.fastq_filepath") # don't need prefix here
-                        file("$row.fastq_filepath") // this is sufficient for filtered
-                    ) 
-                }.set { samples_ch }
             
+            // generate the metadata channel. We need technical_replicate_id for matching
+            meta_ch = validate_sample_table.out
+                .splitCsv(header: true)
+                .map{row -> tuple(row.technical_replicate_id, row)}
+            // Now We map the tuple to tech_id | basename | fastq 
+            fastq_ch = checked_tuple_ch
+                .map { tech_id, basename, fastq -> tuple(tech_id, fastq)}
+            // We join meta and fastq ch using values of tech_id.
+            meta_fastq_ch = meta_ch.join(fastq_ch)
+            
+            meta_fastq_ch
+                .map{tech_id, row, fastq -> tuple("peptide_ref",row.sample_id, file(fastq))}
+                .set {samples_ch}
+            
+            
+            // validate_sample_table.out
+            //     .splitCsv(header:true)
+            //     .map{ row -> 
+            //         tuple(
+            //             "peptide_ref",
+            //             row.sample_id,
+            //             // file("$params.reads_prefix/$row.fastq_filepath") # don't need prefix here
+            //             file("$row.fastq_filepath") // this is sufficient for filtered
+            //         ) 
+            //     }.set { samples_ch }
+            
+            // samples_ch.view()            
             short_read_alignment(
                 generate_index.out
                     .cross(samples_ch)
@@ -177,34 +195,34 @@ workflow ALIGN {
                         )
                     }
                 ) | (sam_to_counts & sam_to_stats)
-        }else if(params.runtype == 'huscan'){
+        // }else if(params.runtype == 'huscan'){
             
-            validate_peptide_table(peptide_ch) | generate_fasta_reference | generate_index2
-            validate_sample_table.out.view()
-                .splitCsv(header:true )
-                .map{ row -> 
-                    tuple(
-                        "peptide_ref",
-                        row.sample_id,
-                        // file("$params.reads_prefix/$row.fastq_filepath") # don't need prefix here
-                        file("$row.fastq_filepath") // this is sufficient for filtered
-                    ) 
-                }.set { samples_ch }
-            samples_ch.view()
-            short_read_alignment2(
-            generate_index2.out
-                .cross(samples_ch)
-                .map{ ref, sample ->
-                    tuple(
-                        sample[1],          // sample_id
-                        file(ref[1]),       // index files
-                        file(sample[2]),    // sample path
-                    )
-                }
-            )
-            // reminder to self below line was commented out for testing HuScan Integration
-            // a hard block to stop from moving forward.            
-            // ) | (sam_to_counts & sam_to_stats)
+        //     validate_peptide_table(peptide_ch) | generate_fasta_reference | generate_index2
+        //     validate_sample_table.out.view()
+        //         .splitCsv(header:true )
+        //         .map{ row -> 
+        //             tuple(
+        //                 "peptide_ref",
+        //                 row.sample_id,
+        //                 // file("$params.reads_prefix/$row.fastq_filepath") # don't need prefix here
+        //                 file("$row.fastq_filepath") // this is sufficient for filtered
+        //             ) 
+        //         }.set { samples_ch }
+        //     samples_ch.view()
+        //     short_read_alignment2(
+        //     generate_index2.out
+        //         .cross(samples_ch)
+        //         .map{ ref, sample ->
+        //             tuple(
+        //                 sample[1],          // sample_id
+        //                 file(ref[1]),       // index files
+        //                 file(sample[2]),    // sample path
+        //             )
+        //         }
+        //     )
+        //     // reminder to self below line was commented out for testing HuScan Integration
+        //     // a hard block to stop from moving forward.            
+        //     // ) | (sam_to_counts & sam_to_stats)
         }
         
         // From here on to the emit stage, comment out when testing HuScan Integration

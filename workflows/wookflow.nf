@@ -331,67 +331,66 @@ workflow WOOKFLOW {
             """.stripIndent()
         }
         sample_ch = Channel.fromPath(params.sample_table)
-        // Running Fastp -> Phippery
-        if(params.run_fastp.toString().toBoolean()){
-            FASTP_WORKFLOW(sample_ch)
-            PHIPPERY(FASTP_WORKFLOW.out)
-        
-        // Omits Fastp. Assumes fastqs are already trimmed / filtered 
-        }else{            
-            PHIPPERY(sample_ch)
-        }
-        PHIPPERYTOAVARDA(PHIPPERY.out)
+        user_pep_id_ch = Channel.value(params.user_pep_id)
+        // Running Fastp -> Phippery        
+        FASTP_WORKFLOW(sample_ch)
+        // FASTP_WORKFLOW.out.filtered_tuple.view()
+        // FASTP_WORKFLOW.out.filtered_info.view()
+        PHIPPERY(
+            FASTP_WORKFLOW.out.filtered_info,
+            FASTP_WORKFLOW.out.filtered_tuple
+        )
+        PHIPPERYTOAVARDA(PHIPPERY.out,user_pep_id_ch)
         virlib = PHIPPERYTOAVARDA.out.virlib
         edgeRhits = PHIPPERYTOAVARDA.out.edgeRhits
         // If params.run_AVARDA was switched on by user, then we run AVARDA 
         // using the outputs from PHIPPERYTOAVARDA. If not, we skip AVARDA 
         if(params.run_AVARDA.toString().toBoolean()){            
             AVARDA(virlib, edgeRhits)
-        }
-    
+        }    
 
     // AVARDA only mode (for VirScan): run AVARDA using user-provided virlib and edgeRhits files, with custom WookScan modifications
     // NO PHIPPERY INVOLVED HERE. USER PROVIDES THEIR OWN VIRLIB AND EDGERHITS, WHICH MAY OR MAY NOT BE DERIVED FROM PHIPPERY OUTPUT
-    }else if(params.runtype == 'avarda_only'){
-        // We're running AVARDA by itself
-        log.info """
-        --------------------------------------
-        WookScan uses   : AVARDA - AVARDA ONLY
-        Runtype         : virscan (but AVARDA only)
-        --------------------------------------
-        AVARDA is developed by:
-        -   Monaco et al.
-        Modification performed by:
-        -   Preston Leung
-        ================================
-        virlib          : $params.avarda_names
-        edgeRhits       : $params.case_path
-        publishDir      : $params.out_path
+    // }else if(params.runtype == 'avarda_only'){
+    //     // We're running AVARDA by itself
+    //     log.info """
+    //     --------------------------------------
+    //     WookScan uses   : AVARDA - AVARDA ONLY
+    //     Runtype         : virscan (but AVARDA only)
+    //     --------------------------------------
+    //     AVARDA is developed by:
+    //     -   Monaco et al.
+    //     Modification performed by:
+    //     -   Preston Leung
+    //     ================================
+    //     virlib          : $params.avarda_names
+    //     edgeRhits       : $params.case_path
+    //     publishDir      : $params.out_path
 
-        """.stripIndent()
+    //     """.stripIndent()
         
-        virlib = Channel.fromPath(params.avarda_names)        
-        edgeRhits =  Channel.fromPath(params.case_path)
-        AVARDA(virlib, edgeRhits)
-    // HuScan mode: run cutadapt, phippery, and skip AVARDA (incompatible with HuScan), with custom WookScan modifications
-    }else if(params.runtype == 'huscan'){
-        println "Running HuScan workflow"
-        sample_ch = Channel.fromPath(params.sample_table)
-        // If we need to process raw paired end files:
-        //  -   This will go through CUTADAPT -> Fastp -> PearMerge before going to phippery        
-        if(params.run_fastp.toString().toBoolean()){
-            println "Running fastp here!!"
-            CUTADAPT_WORKFLOW(sample_ch) // Trim the adapters from 5' end in the fastq files            
-            FASTP_WORKFLOW(CUTADAPT_WORKFLOW.out) // Filter the fastq files            
-            PEARMERGE_WORKFLOW(FASTP_WORKFLOW.out.final_filtered_table_ch) // Merge the paired end reads into single reads
-            PHIPPERY(PEARMERGE_WORKFLOW.out.sample_info) // Run Phippery on the merged reads
-        }
-        // Omits Fastp. Assumes fastqs are already trimmed / filtered (will be added later)
-        // }else{            
-        //     PHIPPERY(Channel.fromPath(params.sample_table))
-        // }
-        // // PHIPPERY()        
-        // PHIPPERYTOAVARDA(PHIPPERY.out)
+    //     virlib = Channel.fromPath(params.avarda_names)        
+    //     edgeRhits =  Channel.fromPath(params.case_path)
+    //     AVARDA(virlib, edgeRhits)
+    // // HuScan mode: run cutadapt, phippery, and skip AVARDA (incompatible with HuScan), with custom WookScan modifications
+    // }else if(params.runtype == 'huscan'){
+    //     println "Running HuScan workflow"
+    //     sample_ch = Channel.fromPath(params.sample_table)
+    //     // If we need to process raw paired end files:
+    //     //  -   This will go through CUTADAPT -> Fastp -> PearMerge before going to phippery        
+    //     if(params.run_fastp.toString().toBoolean()){
+    //         println "Running fastp here!!"
+    //         CUTADAPT_WORKFLOW(sample_ch) // Trim the adapters from 5' end in the fastq files            
+    //         FASTP_WORKFLOW(CUTADAPT_WORKFLOW.out) // Filter the fastq files            
+    //         PEARMERGE_WORKFLOW(FASTP_WORKFLOW.out.final_filtered_table_ch) // Merge the paired end reads into single reads
+    //         PHIPPERY(PEARMERGE_WORKFLOW.out.sample_info) // Run Phippery on the merged reads
+    //     }
+    //     // Omits Fastp. Assumes fastqs are already trimmed / filtered (will be added later)
+    //     // }else{            
+    //     //     PHIPPERY(Channel.fromPath(params.sample_table))
+    //     // }
+    //     // // PHIPPERY()        
+    //     // PHIPPERYTOAVARDA(PHIPPERY.out)
         
     }        
     

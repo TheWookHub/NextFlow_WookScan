@@ -64,9 +64,9 @@ process PHIPOUTPUT_EXTRACT{
 workflow PHIPPERYTOAVARDA{
     take:
         data_phip_ch
-
+        upep_prefix_ch
     main:        
-        upep_prefix_ch = Channel.value(params.user_pep_id)        
+        // upep_prefix_ch = Channel.value(params.user_pep_id)        
         PHIPOUTPUT(upep_prefix_ch,data_phip_ch)
         PHIPOUTPUT_EXTRACT(data_phip_ch)
     emit:

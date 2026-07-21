@@ -66,12 +66,17 @@ include { AGG } from './workflows/aggregate.nf'
 
 workflow PHIPPERY {    
     take:
-        filtered_sample_table_ch    
-    
+        filtered_sample_table_ch
+        filtered_fastq_tuple_ch
     main:
-    // ALIGN(filtered_sample_table_ch) // For testing HuScan Integration
-    ALIGN(filtered_sample_table_ch) | STATS | DSOUT | AGG     
-        // original flow
+    
+    // For testing HuScan Integration
+    ALIGN(filtered_sample_table_ch, filtered_fastq_tuple_ch) | STATS | DSOUT | AGG
+    
+    // Modified flow
+    // ALIGN(filtered_sample_table_ch) | STATS | DSOUT | AGG     
+    
+    // original flow
     // ALIGN | STATS | DSOUT | AGG
 
     emit:
