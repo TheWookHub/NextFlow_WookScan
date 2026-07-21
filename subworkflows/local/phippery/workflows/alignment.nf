@@ -169,8 +169,7 @@ workflow ALIGN {
             
             meta_fastq_ch
                 .map{tech_id, row, fastq -> tuple("peptide_ref",row.sample_id, file(fastq))}
-                .set {samples_ch}
-            
+                .set {samples_ch}           
             
             // validate_sample_table.out
             //     .splitCsv(header:true)
