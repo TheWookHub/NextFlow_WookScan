@@ -24,13 +24,13 @@ relevant_cols = [
 ###########################
 
 
-def getPeptideSummary(sample_list,hits_counts_df):    
+def getPeptideSummary(sample_list,hits_counts_df,category = 'Species'):    
     summaryList = []
     for sample in sample_list:
         r = hits_counts_df.loc[
-            :,['Species',sample]
+            :,[category,sample]
         ].groupby(
-            'Species'
+            category
         ).sum().sort_values(
             by = sample,
             ascending = False
@@ -56,10 +56,12 @@ def makeColumnDict(species_list, column_list):
 # dealing with arguments
 parser = argparse.ArgumentParser()
 parser.add_argument("-d", type=str) # data.phip file
+parser.add_argument("-c", type=str, default="Species") # categories either "Species" or ""
 args = parser.parse_args()
 
 # loading the phip data
 phip_data = ph.load(args.d)
+category = args.c
 peptide_table = phip_data.peptide_table.to_pandas()
 sample_table = phip_data.sample_table.to_pandas()
 
@@ -86,7 +88,7 @@ hits = phip_data.edgeR_hits.to_pandas().rename(columns = reNameDict).loc[:,obser
 #annotated hits
 anno_hits = peptide_table.loc[
     :,
-    ['original_id','Species']
+    ['original_id',category]
 ].merge(
     hits,
     left_index=True,
@@ -95,7 +97,7 @@ anno_hits = peptide_table.loc[
 # retrieve annotated counts table (read count table)
 anno_counts = peptide_table.loc[
     :,
-    ['original_id','Species']
+    ['original_id',category]
 ].merge(
     phip_data.counts.to_pandas(),
     left_index=True,
@@ -105,10 +107,10 @@ anno_counts = peptide_table.loc[
 # annotated hits counts 
 # counts that were not a hit will be flattened to 0
 anno_hits_counts = peptide_table.loc[
-    :,['original_id','Species']
+    :,['original_id',category]
 ].merge(
     anno_counts.drop(
-        columns = control_only + ['original_id','Species']
+        columns = control_only + ['original_id',category]
     ).mul(hits), 
     left_index = True,
     right_index = True
@@ -116,7 +118,7 @@ anno_hits_counts = peptide_table.loc[
 
 # annotated zscores
 anno_zscore = peptide_table.loc[
-    :,['original_id','Species']
+    :,['original_id',category]
 ].merge(
     phip_data.zscore.to_pandas(), 
     left_index = True, 
@@ -124,11 +126,11 @@ anno_zscore = peptide_table.loc[
 ).rename(columns = reNameDict)
 
 # Summarise how many hits counts per species
-hits_counts_species = getPeptideSummary(observation_only, anno_hits_counts)
+hits_counts_species = getPeptideSummary(observation_only, anno_hits_counts,category)
 # summary how many peptide hits per species
 peptide_hit_per_species = anno_hits.loc[
-    :,['Species'] + observation_only
-].groupby('Species').sum()
+    :, [category] + observation_only
+].groupby(category).sum()
 
 # write the outputs 
 sample_table_2.to_csv("sample_table.csv")

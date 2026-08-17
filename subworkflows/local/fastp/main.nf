@@ -18,9 +18,9 @@ process FASTP_OUT{
         tuple val(tech_id),val(basename),path(filename)
     output:        
         tuple val(tech_id),
-              val(basename),
-              path("${basename}_filtered.fastq.gz"),
-              emit: filteredTuple
+            val(basename),
+            path("${basename}_filtered.fastq.gz"),
+            emit: filteredTuple
         //path("*_filtered.fastq.gz"), emit: filteredFqName
         path ("*_filtered.html")
         
@@ -37,24 +37,22 @@ process FASTP_OUT{
 }
 
 process FASTP_OUT_PE{
-    tag "${basename}"
+    tag "${tech_id}"
     publishDir "$params.results/filtered_fastq/", mode: 'copy', overwrite: true    
     input:
-        tuple val(tech_id),val(basename_r1),path(filename_r1),val(basename_r2),path(filename_r2), val(basename)
-    output:
-        // path("*_filtered.fastq.gz"), emit: filteredFqName
-        // path ("*_filtered.html")
+        tuple val(tech_id),val(basename_r1),path(filename_r1),val(basename_r2),path(filename_r2)
+    output:        
         // This outputs the filtered fastq in pairs within a tuple list channel
-        // Each element in the tuple list looks like:
-        // [basename, filtered_fastq_r1_path, filtered_fastq_r2_path]
-        tuple( 
-            val(basename), 
-            path("${basename_r1}_filtered.fastq.gz"), 
-            path("${basename_r2}_filtered.fastq.gz"), 
-            emit: filteredFqName
-        )
-        path("${basename}_filtered.html")
+        // Each element in the tuple list looks like:        
+        tuple val(tech_id),
+              val(basename_r1),
+              val(basename_r2),
+              path("${basename_r1}_filtered.fastq.gz"),
+              path("${basename_r2}_filtered.fastq.gz"),
+              emit: filteredTuple
+        path("*_filtered.html")
     script:
+        def basename = basename_r1.replaceFirst(/_R1_001$/, '')
         """                
         fastp \
         -z 9 \
@@ -90,16 +88,12 @@ process UNRAVEL_FILTERED_NAMES_PE{
         path "filtered_names_collection.tsv", emit: filtered_names_collection
     script:
         def rows = filtered_fastq_list
-        def text = rows.collect { row -> "${row[1].name}\t${row[2].name}"}.join('\n')
-        """
-        cat <<EOF > filtered_names_collection.tsv
-        ${text}
-        EOF
+        def text = rows.collect { row ->"${row[3]}\t${row[4]}"}.join('\n')
+        """    
+        printf '%s\n' '${text}' > filtered_names_collection.tsv
         """
 }
-        // echo ${filtered_fastq_list} | \
-        // grep -o '/[^ ]*fastq.gz' | \
-        // awk '/_R1_/ {r1=\$0} /_R2_/ {print r1 "\t" \$0}' > filtered_names_collection.tsv
+
 // process UPDATE_SAMPLE_TABLE is to update the sample table with the filtered fastq file names
 process UPDATE_SAMPLE_TABLE{    
     publishDir "$params.results/filtered_fastq/", mode: 'copy', overwrite: true
@@ -140,22 +134,11 @@ process UPDATE_SAMPLE_TABLE_PE{
 workflow FASTP_WORKFLOW{
     take:
         sample_ch
+        tuple_ch
     main:
-        // Check if sample table is not default value. If it is not
-        // we assume that file path for samples is provided by user in sample table
-        // file and we do not add default prefix.
-        // if(params.sample_table != "$baseDir/subworkflows/local/phippery/data/pan-cov-example/sample_table_with_beads_and_lib.csv"){
-        //     curr_reads_prefix = ''
-        // }else{
-        //     curr_reads_prefix = params.reads_prefix
-        // }
-        // Take original sample table
-        // got to extract the first column that contains all
-        // the fastq file paths and then run fastp.        
         final_filtered_table_ch = Channel.empty()
         if(params.runtype == "virscan"){
-            println "Running FASTP_WORKFLOW in virscan mode."
-            // sample_ch = Channel.fromPath(params.sample_table)
+            println "Running FASTP_WORKFLOW in virscan mode."            
             sample_ch
                 .splitCsv(header:true)
                 .map{ row -> 
@@ -170,51 +153,59 @@ workflow FASTP_WORKFLOW{
             // file names. After that alter the original sample table so the fastq file paths
             // are pointing to the new filtered fastq files.
             FASTP_OUT(sample_table_ch)            
+            
+            // This is for extracting meta-data from the tuple
             FASTP_OUT.out.filteredTuple
                 .toList()
                 .map{rows -> rows.sort{it[0]}.collect { it[2].name }}
                 .set{filtered_fastq_list_ch}
+            
+            // This is for nextflow to "remember" the input as a tuple
             FASTP_OUT.out.filteredTuple.set{final_filtered_tuple_ch}
             
+            // generate the new file names to match metadata in sample table
             UNRAVEL_FILTERED_NAMES(filtered_fastq_list_ch)
-            UNRAVEL_FILTERED_NAMES.out.filtered_names_collection
-                .set{collection_ch}
-            
+            UNRAVEL_FILTERED_NAMES.out.filtered_names_collection.set{collection_ch}            
             UPDATE_SAMPLE_TABLE(collection_ch,sample_ch)
-            UPDATE_SAMPLE_TABLE.out.filtered_table
-                .set{final_filtered_table_ch}            
-        }else if(params.runtype == "huscan"){
-            println "Running FASTP_WORKFLOW in huscan mode."
-            sample_ch
-            .splitCsv(header:true)
-            .map{ row -> 
-                    tuple(
-                        row.technical_replicate_id,                         
-                        (row.fastq_filepath =~ /.+\/(.+)_trimmed\.fastq\.gz/)[0][1], // extract the base name including r1 tag
-                        file(row.fastq_filepath), // fastq file path for r1
-                        (row.fastq_filepath2 =~ /.+\/(.+)_trimmed\.fastq\.gz/)[0][1], // extract the base name including r2 tag
-                        file(row.fastq_filepath2), // fastq file path for r2
-                        (row.fastq_filepath =~ /.+\/(.+)_R1_001_trimmed\.fastq\.gz/)[0][1] // extract the base name
-                    )                    
-                }
-            .set { sample_table_ch }            
-            FASTP_OUT_PE(sample_table_ch)
+            // This gives us the final filtered metadata table to pair with the tuple
+            UPDATE_SAMPLE_TABLE.out.filtered_table.set{final_filtered_table_ch}
 
-            // toList makes the thing into a single list object not a stream of stuff (e.g. tuple)
-            //UNRAVEL_FILTERED_NAMES_PE(FASTP_OUT_PE.out.filteredFqName.toList())            
-            UNRAVEL_FILTERED_NAMES_PE(
-                FASTP_OUT_PE.out.filteredFqName.toList().map{
-                    rows -> rows.sort { a, b -> a[0] <=> b[0] } // customised comparator to tell how you want to sortt
-                }
-            )
-            //UNRAVEL_FILTERED_NAMES_PE(FASTP_OUT_PE.out.filteredFqName.toList())
+        }else if(params.runtype == "huscan"){
+            println "Running FASTP_WORKFLOW in huscan mode."            
+            
+            // In HuScan mode, things function a little different to VirScan mode
+            // sample_ch - this contains the metadata. only use when updating the sample table
+            // tuple_ch - this is the one need to pass around for process so resume works
+            tuple_ch
+            .flatMap { all_rows -> all_rows }
+            .map{ one_row -> 
+                    tuple(
+                        one_row[0], // technical_replicate_id
+                        one_row[1], // basename_r1
+                        one_row[3], // filename_r1
+                        one_row[2], // basename_r2
+                        one_row[4]  // filename_r2
+                    )
+            }                                                
+            .set{tuple_input_ch}
+            
+            FASTP_OUT_PE(tuple_input_ch)
+            
+            FASTP_OUT_PE.out.filteredTuple
+            .toList()
+            .map{
+                rows -> rows.sort { a, b -> a[0] <=> b[0] } // customised comparator to tell how you want to sortt
+            }
+            .set{final_filtered_tuple_ch}            
+            
+            UNRAVEL_FILTERED_NAMES_PE(final_filtered_tuple_ch)            
             UNRAVEL_FILTERED_NAMES_PE.out.filtered_names_collection.set{collection_ch}
-            UPDATE_SAMPLE_TABLE_PE(collection_ch,sample_ch)
-            final_filtered_table_ch = UPDATE_SAMPLE_TABLE_PE.out.filtered_table
+            UPDATE_SAMPLE_TABLE_PE(collection_ch,sample_ch)            
+            UPDATE_SAMPLE_TABLE_PE.out.filtered_table.set{final_filtered_table_ch}            
         }        
     emit:
         // reminder to self
-        // final_filtered_tuple_ch contains tuple that stores something like this:
+        // final_filtered_tuple_ch contains sorted list of tuples where each tuple looks like:
         // [technical_replicate_id, base_name, fastq_filepath]
         // [BG_8, 1_XXX_8-WEGTY_S8_L001_R1_001, PATH/TO/1_XXX_8-WEGTY_S8_L001_R1_001_filtered.fastq.gz]
         filtered_tuple = final_filtered_tuple_ch 

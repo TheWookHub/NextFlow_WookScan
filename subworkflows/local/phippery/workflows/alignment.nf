@@ -148,28 +148,48 @@ workflow ALIGN {
     take:
         checked_sample_table_ch
         checked_tuple_ch        
-    main:
-        // sample_ch = Channel.fromPath(params.sample_table)
+    main:        
         sample_ch = checked_sample_table_ch
         peptide_ch = Channel.fromPath(params.peptide_table)
         validate_sample_table(sample_ch)        
+        validate_peptide_table(peptide_ch) | generate_fasta_reference
+        
+        // generate the metadata channel. We need technical_replicate_id for matching
+        meta_ch = validate_sample_table.out
+        .splitCsv(header: true)
+        .map{row -> tuple(row.technical_replicate_id, row)}
+
+        // Now We map the tuple to tech_id | basename | fastq         
+        fastq_ch = checked_tuple_ch
+        .map { tech_id, basename, fastq -> tuple(tech_id, fastq)}
+        
+        // We join meta and fastq ch using values of tech_id.
+        meta_fastq_ch = meta_ch.join(fastq_ch)
+        
+        // make it back into a tuple, set it as samples_ch (note: plural)
+        // then pass it to short reads alignment or short reads alignment 2
+        // depending if its virscan or huscan.
+        meta_fastq_ch
+        .map{tech_id, row, fastq -> tuple("peptide_ref",row.sample_id, file(fastq))}
+        .set {samples_ch}
+
 
         if(params.runtype == 'virscan'){
-            validate_peptide_table(peptide_ch) | generate_fasta_reference | generate_index
+            // validate_peptide_table(peptide_ch) | generate_fasta_reference | generate_index
+            generate_index(generate_fasta_reference.out)
             
-            // generate the metadata channel. We need technical_replicate_id for matching
-            meta_ch = validate_sample_table.out
-                .splitCsv(header: true)
-                .map{row -> tuple(row.technical_replicate_id, row)}
-            // Now We map the tuple to tech_id | basename | fastq 
-            fastq_ch = checked_tuple_ch
-                .map { tech_id, basename, fastq -> tuple(tech_id, fastq)}
-            // We join meta and fastq ch using values of tech_id.
-            meta_fastq_ch = meta_ch.join(fastq_ch)
+            // meta_ch = validate_sample_table.out
+            //     .splitCsv(header: true)
+            //     .map{row -> tuple(row.technical_replicate_id, row)}
+            // // Now We map the tuple to tech_id | basename | fastq 
+            // fastq_ch = checked_tuple_ch
+            //     .map { tech_id, basename, fastq -> tuple(tech_id, fastq)}
+            // // We join meta and fastq ch using values of tech_id.
+            // meta_fastq_ch = meta_ch.join(fastq_ch)
             
-            meta_fastq_ch
-                .map{tech_id, row, fastq -> tuple("peptide_ref",row.sample_id, file(fastq))}
-                .set {samples_ch}           
+            // meta_fastq_ch
+            //     .map{tech_id, row, fastq -> tuple("peptide_ref",row.sample_id, file(fastq))}
+            //     .set {samples_ch}
             
             // validate_sample_table.out
             //     .splitCsv(header:true)
@@ -181,47 +201,49 @@ workflow ALIGN {
             //             file("$row.fastq_filepath") // this is sufficient for filtered
             //         ) 
             //     }.set { samples_ch }
-            
-            // samples_ch.view()            
+
             short_read_alignment(
                 generate_index.out
-                    .cross(samples_ch)
-                    .map{ ref, sample ->
-                        tuple(
-                            sample[1],          // sample_id
-                            file(ref[1]),       // index files
-                            file(sample[2]),    // sample path
-                        )
-                    }
-                ) | (sam_to_counts & sam_to_stats)
-        // }else if(params.runtype == 'huscan'){
+                .cross(samples_ch)
+                .map{ ref, sample ->
+                    tuple(
+                        sample[1],          // sample_id
+                        file(ref[1]),       // index files
+                        file(sample[2]),    // sample path
+                    )
+                }
+            ) | (sam_to_counts & sam_to_stats)
+        }else if(params.runtype == 'huscan'){
             
-        //     validate_peptide_table(peptide_ch) | generate_fasta_reference | generate_index2
-        //     validate_sample_table.out.view()
-        //         .splitCsv(header:true )
-        //         .map{ row -> 
-        //             tuple(
-        //                 "peptide_ref",
-        //                 row.sample_id,
-        //                 // file("$params.reads_prefix/$row.fastq_filepath") # don't need prefix here
-        //                 file("$row.fastq_filepath") // this is sufficient for filtered
-        //             ) 
-        //         }.set { samples_ch }
-        //     samples_ch.view()
-        //     short_read_alignment2(
-        //     generate_index2.out
-        //         .cross(samples_ch)
-        //         .map{ ref, sample ->
-        //             tuple(
-        //                 sample[1],          // sample_id
-        //                 file(ref[1]),       // index files
-        //                 file(sample[2]),    // sample path
-        //             )
-        //         }
-        //     )
-        //     // reminder to self below line was commented out for testing HuScan Integration
-        //     // a hard block to stop from moving forward.            
-        //     // ) | (sam_to_counts & sam_to_stats)
+            // validate_peptide_table(peptide_ch) | generate_fasta_reference | generate_index2
+            generate_index2(generate_fasta_reference.out)        
+
+            // validate_sample_table.out
+            //     .splitCsv(header:true )
+            //     .map{ row -> 
+            //         tuple(
+            //             "peptide_ref",
+            //             row.sample_id,
+            //             // file("$params.reads_prefix/$row.fastq_filepath") # don't need prefix here
+            //             file("$row.fastq_filepath") // this is sufficient for filtered
+            //         ) 
+            //     }.set { samples_ch }
+            // samples_ch.view()
+            short_read_alignment2(
+                generate_index2.out
+                .cross(samples_ch)
+                .map{ ref, sample ->
+                    tuple(
+                        sample[1],          // sample_id
+                        file(ref[1]),       // index files
+                        file(sample[2]),    // sample path
+                    )
+                }
+            
+            
+            // reminder to self below line was commented out for testing HuScan Integration
+            // a hard block to stop from moving forward.            
+            ) | (sam_to_counts & sam_to_stats)
         }
         
         // From here on to the emit stage, comment out when testing HuScan Integration
@@ -233,7 +255,7 @@ workflow ALIGN {
             validate_sample_table.out,
             validate_peptide_table.out
         )
-
+        
         final_output = ds
         if ( params.replicate_sequence_counts )
             final_output = replicate_counts(ds)
