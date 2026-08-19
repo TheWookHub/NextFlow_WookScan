@@ -287,11 +287,11 @@ PATH/TO/beads_only_BG5_raw.fastq.gz|beads_only|BG-05|BG|
 |2|3|ATTACCGC...|A0A126|3|Papiine herpesvirus 2|ITA...|
 
 **Example column titles for peptide table (HuScan):**
-|peptide_id|original_id|ref_accession|description|oligo|Prot|
-|-----|-----|-----|-----|-----|-----|
-|0|NP_006603.2_fragment_24|NP_006603.2|kinesin-like protein KIF1C [Homo sapiens] fragment_24|GAACCG...|EP...|
-|1|XP_011527716.1_fragment_13|XP_011527716.1|PREDICTED: solute carrier family 23 member 2 isoform X1 [Homo sapiens] fragment_13|ATGTTT...|MF...|
-|2|XP_011527716.1_fragment_12|XP_011527716.1|PREDICTED: solute carrier family 23 member 2 isoform X1 [Homo sapiens] fragment_12|AACGTG...|NV...|
+|peptide_id|original_id|ref_accession|oligo|Prot|
+|-----|-----|-----|-----|-----|
+|0|NP_006603.2_fragment_24|NP_006603.2|GAACCG...|EP...|
+|1|XP_011527716.1_fragment_13|XP_011527716.1|ATGTTT...|MF...|
+|2|XP_011527716.1_fragment_12|XP_011527716.1|AACGTG...|NV...|
 
 
 ## AVARDA parameters
