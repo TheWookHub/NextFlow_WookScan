@@ -130,7 +130,6 @@ process UPDATE_SAMPLE_TABLE_PE{
         """
 }
 
-
 workflow FASTP_WORKFLOW{
     take:
         sample_ch

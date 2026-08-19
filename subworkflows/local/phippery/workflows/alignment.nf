@@ -90,7 +90,6 @@ process short_read_alignment2 {
 
 }
 
-
 // COMPUTE ALIGNMENT STATS FOR ALL STATS
 process sam_to_stats {
     input:
@@ -101,7 +100,6 @@ process sam_to_stats {
     template "sam_to_stats.sh"
 }
 
-
 // COMPUTE COUNTS FOR ALL SAMPLES
 process sam_to_counts {
     input: tuple val(sample_id), path(sam_file)
@@ -109,7 +107,6 @@ process sam_to_counts {
     shell:
     template "sam_to_counts.sh"
 }
-
 
 // COLLECT AND MERGE ALL 
 // TODO move to bin script remove from phippery
@@ -160,8 +157,9 @@ workflow ALIGN {
         .map{row -> tuple(row.technical_replicate_id, row)}
 
         // Now We map the tuple to tech_id | basename | fastq         
-        fastq_ch = checked_tuple_ch
-        .map { tech_id, basename, fastq -> tuple(tech_id, fastq)}
+        checked_tuple_ch
+        .map {tech_id, basename, fastq -> tuple(tech_id, fastq)}
+        .set{fastq_ch}
         
         // We join meta and fastq ch using values of tech_id.
         meta_fastq_ch = meta_ch.join(fastq_ch)
@@ -174,34 +172,8 @@ workflow ALIGN {
         .set {samples_ch}
 
 
-        if(params.runtype == 'virscan'){
-            // validate_peptide_table(peptide_ch) | generate_fasta_reference | generate_index
-            generate_index(generate_fasta_reference.out)
-            
-            // meta_ch = validate_sample_table.out
-            //     .splitCsv(header: true)
-            //     .map{row -> tuple(row.technical_replicate_id, row)}
-            // // Now We map the tuple to tech_id | basename | fastq 
-            // fastq_ch = checked_tuple_ch
-            //     .map { tech_id, basename, fastq -> tuple(tech_id, fastq)}
-            // // We join meta and fastq ch using values of tech_id.
-            // meta_fastq_ch = meta_ch.join(fastq_ch)
-            
-            // meta_fastq_ch
-            //     .map{tech_id, row, fastq -> tuple("peptide_ref",row.sample_id, file(fastq))}
-            //     .set {samples_ch}
-            
-            // validate_sample_table.out
-            //     .splitCsv(header:true)
-            //     .map{ row -> 
-            //         tuple(
-            //             "peptide_ref",
-            //             row.sample_id,
-            //             // file("$params.reads_prefix/$row.fastq_filepath") # don't need prefix here
-            //             file("$row.fastq_filepath") // this is sufficient for filtered
-            //         ) 
-            //     }.set { samples_ch }
-
+        if(params.runtype == 'virscan'){            
+            generate_index(generate_fasta_reference.out)            
             short_read_alignment(
                 generate_index.out
                 .cross(samples_ch)
@@ -214,21 +186,7 @@ workflow ALIGN {
                 }
             ) | (sam_to_counts & sam_to_stats)
         }else if(params.runtype == 'huscan'){
-            
-            // validate_peptide_table(peptide_ch) | generate_fasta_reference | generate_index2
-            generate_index2(generate_fasta_reference.out)        
-
-            // validate_sample_table.out
-            //     .splitCsv(header:true )
-            //     .map{ row -> 
-            //         tuple(
-            //             "peptide_ref",
-            //             row.sample_id,
-            //             // file("$params.reads_prefix/$row.fastq_filepath") # don't need prefix here
-            //             file("$row.fastq_filepath") // this is sufficient for filtered
-            //         ) 
-            //     }.set { samples_ch }
-            // samples_ch.view()
+            generate_index2(generate_fasta_reference.out)
             short_read_alignment2(
                 generate_index2.out
                 .cross(samples_ch)
@@ -238,17 +196,10 @@ workflow ALIGN {
                         file(ref[1]),       // index files
                         file(sample[2]),    // sample path
                     )
-                }
-            
-            
-            // reminder to self below line was commented out for testing HuScan Integration
-            // a hard block to stop from moving forward.            
+                }            
             ) | (sam_to_counts & sam_to_stats)
         }
         
-        // From here on to the emit stage, comment out when testing HuScan Integration
-        // because we want to stop here. If it is uncommented, it is because
-        // I am allowing the flow to continue to the end of the pipeline if running VirScan.
         ds = collect_phip_data(
             sam_to_counts.out.toSortedList(),
             sam_to_stats.out.toSortedList(),

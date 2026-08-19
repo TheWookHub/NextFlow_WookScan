@@ -40,20 +40,6 @@ nextflow.enable.dsl = 2
 //     params.reads_prefix = "$baseDir"
 // params.peptide_table    = "./data/pan-cov-example/peptide_table.csv"
 // params.results          = "$PWD/results/"
-
-
-// log.info """\
-// P H I P - F L O W!
-// Matsen, Overbaugh, and Minot Labs
-// Fred Hutchinson CRC, Seattle WA
-// ================================
-// sample_table    : $params.sample_table
-// peptide_table   : $params.peptide_table
-// results         : $params.results
-// reads_prefix    : $params.reads_prefix
-
-// """
-
 /* 
  * Import modules 
  */
@@ -70,11 +56,8 @@ workflow PHIPPERY {
         filtered_fastq_tuple_ch
     main:
     
-    // For testing HuScan Integration
-    ALIGN(filtered_sample_table_ch, filtered_fastq_tuple_ch) | STATS | DSOUT | AGG
-    
     // Modified flow
-    // ALIGN(filtered_sample_table_ch) | STATS | DSOUT | AGG     
+    ALIGN(filtered_sample_table_ch, filtered_fastq_tuple_ch) | STATS | DSOUT | AGG
     
     // original flow
     // ALIGN | STATS | DSOUT | AGG

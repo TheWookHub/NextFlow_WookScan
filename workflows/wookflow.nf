@@ -75,7 +75,7 @@ workflow WOOKFLOW {
     def defined_profiles = [
         'virscan', 'huscan', 'avarda_only',
         'standard', 'debug','conda',
-        'docker','singularity','arm',
+        'docker','singularity','apptainer',
         'test','test_full'
     ]
     def invalid_profiles = active_profiles - defined_profiles
@@ -357,28 +357,27 @@ workflow WOOKFLOW {
 
     // AVARDA only mode (for VirScan): run AVARDA using user-provided virlib and edgeRhits files, with custom WookScan modifications
     // NO PHIPPERY INVOLVED HERE. USER PROVIDES THEIR OWN VIRLIB AND EDGERHITS, WHICH MAY OR MAY NOT BE DERIVED FROM PHIPPERY OUTPUT
-    // }else if(params.runtype == 'avarda_only'){
-    //     // We're running AVARDA by itself
-    //     log.info """
-    //     --------------------------------------
-    //     WookScan uses   : AVARDA - AVARDA ONLY
-    //     Runtype         : virscan (but AVARDA only)
-    //     --------------------------------------
-    //     AVARDA is developed by:
-    //     -   Monaco et al.
-    //     Modification performed by:
-    //     -   Preston Leung
-    //     ================================
-    //     virlib          : $params.avarda_names
-    //     edgeRhits       : $params.case_path
-    //     publishDir      : $params.out_path
+    }else if(params.runtype == 'avarda_only'){    
+        log.info """
+        --------------------------------------
+        WookScan uses   : AVARDA - AVARDA ONLY
+        Runtype         : virscan (but AVARDA only)
+        --------------------------------------
+        AVARDA is developed by:
+        -   Monaco et al.
+        Modification performed by:
+        -   Preston Leung
+        ================================
+        virlib          : $params.avarda_names
+        edgeRhits       : $params.case_path
+        publishDir      : $params.out_path
 
-    //     """.stripIndent()
+        """.stripIndent()
         
-    //     virlib = Channel.fromPath(params.avarda_names)        
-    //     edgeRhits =  Channel.fromPath(params.case_path)
-    //     AVARDA(virlib, edgeRhits)
-    // // HuScan mode: run cutadapt, phippery, and skip AVARDA (incompatible with HuScan), with custom WookScan modifications
+        virlib = Channel.fromPath(params.avarda_names)        
+        edgeRhits =  Channel.fromPath(params.case_path)
+        AVARDA(virlib, edgeRhits)
+    // HuScan mode: run cutadapt, phippery, and skip AVARDA (incompatible with HuScan), with custom WookScan modifications
     }else if(params.runtype == 'huscan'){
         println "Running HuScan workflow"
         sample_ch = Channel.fromPath(params.sample_table)
