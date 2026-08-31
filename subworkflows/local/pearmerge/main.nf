@@ -10,14 +10,18 @@ nextflow.enable.dsl=2
 
 // process FASTP_OUT is to take in the fastq 
 process PEAR_OUT{
-    tag "${basename}"
+    tag "${basename_r1}"
     publishDir "$params.results/merged_fastq/", mode: 'copy', overwrite: true    
     input:
-        tuple path(filename_r1),path(filename_r2), val(basename)
+        tuple val(tech_id), path(filename_r1),path(filename_r2), val(basename_r1)
     output:
-        path("*.assembled.fastq.gz"), emit: mergedFqName        
-        
+        // path("*.assembled.fastq.gz"), emit: mergedFqName
+        tuple val(tech_id),
+            val(basename_r1),
+            path("*.assembled.fastq.gz"),
+            emit: mergedFqTuple
     script:
+        def basename = basename_r1.replaceFirst(/_R1_001$/, '')
         """
         pear --threads ${task.cpus} \
         -f ${filename_r1} \
@@ -34,13 +38,10 @@ process UNRAVEL_ASSEMBLED_NAMES{
         val assembled_fastq_list
     output:
         path "assembled_names_collection.txt", emit: assembled_names_collection
-    script:
+    script:        
+        def text = assembled_fastq_list.collect { row ->"${row[2]}"}.join('\n')
         """
-        for item in ${assembled_fastq_list.join(' ')}; 
-        do            
-            echo "\$item" >> assembled_names_collection.txt
-        done
-
+        printf '%s\n' '${text}' > assembled_names_collection.txt
         """
 }
 
@@ -65,23 +66,31 @@ process UPDATE_SAMPLE_TABLE{
 
 workflow PEARMERGE_WORKFLOW{
     take:
+        tuple_ch
         sample_ch
     main:        
-        println "Running PEARMERGE_WORKFLOW in huscan mode."            
-            sample_ch.splitCsv(header:true)
-            .map{ row -> 
-                    tuple(
-                        file(row.fastq_filepath), // fastq file path for r1                        
-                        file(row.fastq_filepath2), // fastq file path for r2
-                        (row.fastq_filepath =~ /.+\/(.+)_R1_001_filtered\.fastq\.gz/)[0][1] // extract the base name
-                    )                    
-                }
-            .set { sample_table_ch }
-        // sample_ch.view()
-        PEAR_OUT(sample_table_ch)        
-        UNRAVEL_ASSEMBLED_NAMES(PEAR_OUT.out.mergedFqName.toList())
-        UPDATE_SAMPLE_TABLE(UNRAVEL_ASSEMBLED_NAMES.out.assembled_names_collection, sample_ch)
+        println "Running PEARMERGE_WORKFLOW in huscan mode."        
+        tuple_ch
+        .flatMap { all_rows -> all_rows }
+        .map{ one_row -> 
+                tuple(
+                    one_row[0],  // tech_id
+                    one_row[3],  // filename_r1                        
+                    one_row[4],  // filename_r2
+                    one_row[1]   // basename_r1 to be used for extracting basename
+                )
+        }                                                
+        .set{tuple_input_ch}        
+        PEAR_OUT(tuple_input_ch)
+        PEAR_OUT.out.mergedFqTuple
+        .toList()
+            .map{
+                rows -> rows.sort { a, b -> a[0] <=> b[0] } // customised comparator to tell how you want to sortt
+            }.set{merged_fastq_list_ch}
+        UNRAVEL_ASSEMBLED_NAMES(merged_fastq_list_ch)
+        UPDATE_SAMPLE_TABLE(UNRAVEL_ASSEMBLED_NAMES.out.assembled_names_collection, sample_ch)        
     emit:
-        sample_info = UPDATE_SAMPLE_TABLE.out.assembled_table
+        assembled_tuple = PEAR_OUT.out.mergedFqTuple
+        assembled_info = UPDATE_SAMPLE_TABLE.out.assembled_table
 }
 

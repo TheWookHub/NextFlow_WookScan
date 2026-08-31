@@ -2,9 +2,15 @@
 
 ## Introduction
 
-**nf-core/wookflow** is a bioinformatics pipeline that integrates several tools into one. The pipeline can be broken down into two components. Pre-PhIPSeq oligonucleotide library generation and Post-PhIPSeq sequence analysis. Briefly, PhIPSeq (Phage Immunoprecipitate Sequencing) is a technique that makes use of phages to display peptides on the surface such that antibodies can bind onto. This is followed by separating phages bound by antibodies to those that aren't through the use of magnetic beads. Non-bound beads are then washed away with the remaining bound phages progress to sequencing. For Pre-PhIPSeq BIPS and Dolphyn have been integrated to support custom oligonucleotide library support while phippery supports Post-PhIPSeq data analysis. AVARDA (also Post-PhIPSeq) is a VirScan (defined Human virome oligonucleotide library) Library specific tool that helps to identify individual species of viruses when cross-reactivity exists (Fig. 1). Unfortunately the open source AVARDA is currently an unmonitored project with developers having moved on, implementations adapting AVARDA to other oligonucleotide library will be a future project (unsure when).
+**Wookflow** is a bioinformatics kit that integrates several tools into one nextflow pipeline. The pipeline can be broken down into two components. Pre-PhIPSeq oligonucleotide library generation and Post-PhIPSeq sequence analysis. Briefly, PhIPSeq (Phage Immunoprecipitate Sequencing) is a technique that makes use of phages to display peptides on the surface such that antibodies can bind onto. This is followed by separating phages bound by antibodies to those that aren't through the use of magnetic beads. Non-bound beads are then washed away with the remaining bound phages progress to sequencing. As for what peptides the phages will display for antibody binding is dependent on the library selected for the PhIPSeq experiment. For instance, HuScan uses a library of peptides from human proteins to perform PhIPSeq while VirScan uses peptides from all known human-infecting viruses as the library for PhIPSeq. The current implementation of the pipeline supports HuScan (data usually come in paired-end fastqs) and VirScan (data usually in single-end fastqs) variants of PhIPSeq. 
 
-Pre-PhIPSeq library generation (Fig. 1) aims to provide an integrated approach to go from protein sequences direcctly to oligonucleotide library such that it can be synthesised and be ready for PhIPSeq experiments. Post-PhIPSeq analysis (Fig. 1) aims to allow a smooth flow from fastq files to read counts data that are ready for down stream analyses. While phippery outputs counts data together with edgeR hits to identify peptides that were significantly occurring above background noise, AVARDA will take the hits data to determine which species have been observed based on the peptide hits. AVARDA also accounts for the potential similarity between peptides that come from organisms with high similarity in their genetics. This in turn allows the determination of whether a species can be uniquely identified as due to existence of peptides that were exclusively from that species.
+For Pre-PhIPSeq `BIPS` and `Dolphyn` have been integrated to support custom oligonucleotide library support while `phippery` supports Post-PhIPSeq data analysis. Pre-PhIPSeq library generation (Fig. 1) aims to provide an integrated approach to go from protein sequences direcctly to oligonucleotide library such that it can be synthesised and be ready for PhIPSeq experiments. 
+
+Post-PhIPSeq analysis (Fig. 1) aims to allow a smooth flow from fastq files to read counts data that are ready for down stream analyses. While phippery outputs counts data together with edgeR hits to identify peptides that were significantly occurring above background noise. 
+
+AVARDA can be used after phippery and take the hits data to estimate which species were likely involved in previous infection based on the peptide hits. AVARDA also accounts for the potential similarity between peptides that come from organisms with high similarity in their genetics. This in turn allows the determination of whether a species can be uniquely identified as due to existence of peptides that were exclusively from that species. AVARDA is a VirScan (defined Human virome oligonucleotide library) Library specific tool that helps to identify individual species of viruses when cross-reactivity exists (Fig. 1). Unfortunately the open source AVARDA is currently an unmonitored project with developers having moved on, implementations adapting AVARDA to other oligonucleotide library will be a future project (unsure when). It is also worth to note that AVARDA has a fixed library to VirScan (library V3) and other version of of the library are unavailable online and can only be accessed as a paid service either through CDI laboratories or InfiniityBio services.
+
+
 
 ![Test Image](readme_figures/WookFlow_Illustration.png)
 
@@ -76,9 +82,21 @@ This command provides a standardized and fully reproducible method for each work
 
 ## Running Post-PhIPSeq Analysis on fastq files
 
-Two main files that are required for Phippery component is the `--sample_table` which stores information about location of the fastq files, along with metadata associated with the samples. The second file is the `--peptide_table`, and this table stores the annotations of each peptide in the PhIPSeq Library. For example in the VirScan library, each one of the 106,678 peptides will have **Species**, **Prot** etc. to be used as reference for determining how many sequenced reads fall into what peptide from which species.
+Two main files that are required for Phippery component is the `--sample_table` which stores information about location of the fastq files, along with metadata associated with the samples. The second file is the `--peptide_table`, and this table stores the annotations of each peptide in the PhIPSeq Library. For example in the VirScan library, each one of the 106,678 peptides will have **Species**, **Prot** etc. to be used as reference for determining how many sequenced reads fall into what peptide from which species (see below for what peptide/sample tables should look like as input files).
 
-General phippery runs assume fastq files are already trimmed and filtered. You can optionally give the raw fastq files to wookflow and then turn `--run_fastp True` in the parameters and Wookflow will run them through fastp. To specify the path of fastq files edit it in the `.csv` file for `--sample_table` input.
+Wookflow assume fastq files are raw and not trimmed or filtered, hence it will run through `fastp` for VirScan. Given the characteristics of the HuScan library `cutadapt` will be performed to remove primers / adapters that were included in the reads of the paired-end fastqs, followed by `fastp` and then merged using `pearmerge` tool prior to running `phippery`.
+
+**Note:** Cutadapter adapter set for removal in HuScan fastq reads can be found under: `subworkflows/local/cutadapt/adapter_files`.
+
+Two types of **profiles** needs to be included in the parameters depending which mode you would like to run Wookflow in:
+- Pipeline modes: virscan, avarda_only, or huscan
+- Execution Environments: docker, apptainer, or singularity 
+
+Apptainer & singularity is used if docker isn't available, which can happen in HPC environments. They're pretty much interchangeable, so it shouldn't matter if you choose apptainer over singularity or vice-versa.
+
+**Useful:** If for whatever reason your run of Wookflow become disrupted. You can attach `-resume` in the command line and it should pick up where it left off. However this assumes you haven't cleaned out your `work` folder that holds all the intermediate files.
+
+See below for different options:
 
 ```
 ####################
@@ -86,8 +104,10 @@ General phippery runs assume fastq files are already trimmed and filtered. You c
 ####################
 
 # Running Phippery Only #
+# original phippery uses bowtie aligner
+# requires specifying --oligo_tile_length (based on your library)  and --read_length (based on your fastq read lengths)
 nextflow run /home/preston/PhIPSeq-Pipelines/nf-core-wookflow/main.nf \
--profile virscan \
+-profile virscan,docker \
 --peptide_table InputFiles/peptide_table_VIR3_full_v7.csv \
 --sample_table InputFiles/sample_table_UNSW_VirScan.csv \
 --run_cpm_enr_workflow true \
@@ -97,9 +117,11 @@ nextflow run /home/preston/PhIPSeq-Pipelines/nf-core-wookflow/main.nf \
 --dataset_prefix "data"
 
 # Running Phippery & AVARDA #
+# original phippery uses bowtie aligner
+# requires specifying --oligo_tile_length (based on your library)  and --read_length (based on your fastq read lengths)
 nextflow run ../nf-core-wookflow/main.nf \
 --run_AVARDA true \
--profile virscan \
+-profile virscan,docker \
 --peptide_table InputFiles/peptide_table_VIR3_full_v7.csv \
 --sample_table InputFiles/sample_table_UNSW_VirScan.csv \
 --run_cpm_enr_workflow True \
@@ -109,15 +131,15 @@ nextflow run ../nf-core-wookflow/main.nf \
 --out_path ../WookScanNextFlowTest2/avarda_reults \
 --out_name PHIPAVARDA \
 --max_cpus 24 \
---max_memory '36.GB' \
---run_fastp true 
+--max_memory '36.GB'
+
 
 
 # Running Only AVARDA (assumes you have some hits data) #
-# Note: AVARDA only works for VirScan Library for now.
+# Note: AVARDA only works for VirScan Library.
 
 nextflow run ../nf-core-wookflow/main.nf \
--profile avarda_only \
+-profile avarda_only,docker \
 --case_path ../nf-core-wookflow/subworkflows/local/AVARDA/data/example_input/AVARDA_test_data.tsv.gz \
 --avarda_names ../nf-core-wookflow/subworkflows/local/AVARDA/data/avarda_names/avarda_names.csv.gz
 --out_path ../WookScanNextFlowTest2/TestWookFlow2_AVARDA \
@@ -127,6 +149,45 @@ nextflow run ../nf-core-wookflow/main.nf \
 
 ```
 
+```
+####################
+# Profile: HuScan #
+####################
+
+# Using docker
+
+nextflow run ../nf-core-wookflow/ \
+-profile huscan,docker \
+--peptide_table InputFiles/peptide_table_HuScan_Lib_V1.2.csv \
+--sample_table InputFiles/sample_table_HuScan_LibTest_V1_KIM19178_TEST.csv \
+--results /home/preston/PhIPSeq-Pipelines/TestWookFlow/KIM19178_HuScan_TEST/phippery_huscan_test \
+--max_cpus 16 \
+--max_memory '32.GB'
+
+
+# Using apptainer or singularity
+# NXF_APPTAINER_HOME_MOUNT=true or NXF_SINGULARITY_HOME_MOUNT=true is required because without it 
+# apptainer / singularity will by default add a --no-home parameter which restricts access to local 
+# home directory access. Phippery's edgeR script will have trouble look for R cache.
+
+NXF_APPTAINER_HOME_MOUNT=true nextflow run ../nf-core-wookflow/ \
+-profile huscan,apptainer \
+--peptide_table InputFiles/peptide_table_HuScan_Lib_V1.2.csv \
+--sample_table InputFiles/sample_table_HuScan_LibTest_V1_KIM19178_TEST.csv \
+--results /home/preston/PhIPSeq-Pipelines/TestWookFlow/KIM19178_HuScan_TEST/phippery_huscan_test \
+--max_cpus 16 \
+--max_memory '32.GB'
+
+NXF_SINGULARITY_HOME_MOUNT=true nextflow run ../nf-core-wookflow/ \
+-profile huscan,singularity \
+--peptide_table InputFiles/peptide_table_HuScan_Lib_V1.2.csv \
+--sample_table InputFiles/sample_table_HuScan_LibTest_V1_KIM19178_TEST.csv \
+--results /home/preston/PhIPSeq-Pipelines/TestWookFlow/KIM19178_HuScan_TEST/phippery_huscan_test \
+--max_cpus 16 \
+--max_memory '32.GB'
+
+
+```
 ## Other adjustable Phippery parameters
 
 Default values are shown in square bracers `[]`.
@@ -192,9 +253,13 @@ Default values are shown in square bracers `[]`.
 
 ### Note on sample and peptide tables
 
-Below are two examples of what sample table and peptide table should look like. For sample table, `fastq_filespath` and `control_status` is required. other columns are optional and can be mentioned in the parameters when using certain workflows (for example, when `--summarize_by_organism` option is on, ` --sample_grouping_col` can be set to `sample_source` column).
+Below are examples of what sample table and peptide table should look like. For sample table, `fastq_filespath` and `control_status` is required. other columns are optional and can be mentioned in the parameters when using certain workflows (for example, when `--summarize_by_organism` option is on, ` --sample_grouping_col` can be set to `sample_source` column).
 
-Peptide table requires minimum columns `peptide_id` and `oligo`. Similar to sample table, other additional columns are optional (for example, when `--summarize_by_organism` option is on, `--peptide_org_col` can be set to `Species` column).
+For Peptide table: 
+- VirScan requires minimum columns `peptide_id`,`Species` and `oligo`. 
+- HuScan requires minimum columns `peptide_id`,`ref_accession` and `oligo`.
+
+Similar to sample table, other additional columns are optional.
 
 
 
@@ -214,18 +279,19 @@ PATH/TO/beads_only_BG4_raw.fastq.gz|beads_only|BG-04|BG|
 PATH/TO/beads_only_BG5_raw.fastq.gz|beads_only|BG-05|BG|
 
 
-**Example column titles for peptide table:**
+**Example column titles for peptide table (VirScan):**
 |peptide_id|original_id|oligo|UniProtEntry|VIR3Expanded_id|Species|Prot
 |-----|-----|-----|-----|-----|-----|-----|
-|0|1|ATGCGCAGCTTGCTGTTTGTGGTCGGTGCTTGGGTCGCTGCTCTCGTCAC|A0A126|1|Papiine herpesvirus 2|MRSLLFVVGAWVAALVTNLTPDAALASGTTTTAAAGNTSATASPGDNATSIDAGST|
-|1|2|ACTACAACCACCGCTGCCGCAGGGAACACATCTGCAACAGCTTCTCCAGG|A0A126|2|Papiine herpesvirus 2|TTTTAAAGNTSATASPGDNATSIDAGSTITAAAPPGHSTPWPALPTDLALPLVIGG|
-|2|3|ATTACCGCTGCCGCTCCTCCAGGTCATTCAACACCTTGGCCTGCACTCCC|A0A126|3|Papiine herpesvirus 2|ITAAAPPGHSTPWPALPTDLALPLVIGGLCALTLAAMGAGALLHRCCRRCARRRQN
-|3|4|TTGTGCGCCCTCACACTCGCAGCAATGGGCGCCGGGGCATTGCTTCATCG|A0A126|4|Papiine herpesvirus 2|LCALTLAAMGAGALLHRCCRRCARRRQNVSSVSA|
-|4|5|CGCGATCGCGGCCCTTCTCGCTCTCGCGTGCGCTACACCCGCCTGGCTGC|A0A130|5|Papiine herpesvirus 2|RDRGPSRSRVRYTRLAASEA|
-|5|6|ATGGGGTTTGGCGCCGCAGCAGCACTGTTGGCTCTGGCAGTTGCACTCGC|A0A132|6|Papiine herpesvirus 2|MGFGAAAALLALAVALARVPAGGGAYVPVDRALTRVSPNRFRGSSLPPPEQKTDPP|
-|6|7|GTGGACCGCGCACTCACACGCGTTAGCCCAAACCGCTTCCGCGGTTCATC|A0A132|7|Papiine herpesvirus 2|VDRALTRVSPNRFRGSSLPPPEQKTDPPDVRRVYH|
+|0|1|ATGCGCAG...|A0A126|1|Papiine herpesvirus 2|MRS...|
+|1|2|ACTACAAC...|A0A126|2|Papiine herpesvirus 2|TTT...|
+|2|3|ATTACCGC...|A0A126|3|Papiine herpesvirus 2|ITA...|
 
-
+**Example column titles for peptide table (HuScan):**
+|peptide_id|original_id|ref_accession|oligo|Prot|
+|-----|-----|-----|-----|-----|
+|0|NP_006603.2_fragment_24|NP_006603.2|GAACCG...|EP...|
+|1|XP_011527716.1_fragment_13|XP_011527716.1|ATGTTT...|MF...|
+|2|XP_011527716.1_fragment_12|XP_011527716.1|AACGTG...|NV...|
 
 
 ## AVARDA parameters
@@ -282,6 +348,28 @@ Default values are shown in square bracers `[]`.
 
 When generating the Pre-PhIPSeq oligonucleotide library, the output will be located at where you've defined  `--outdir` to be.
 
+
+## Cleaning Wookflow runs
+
+It is expected the work folder would be huge in size (easily > 100gb). You can use `nextflow` in-built cleaning options to remove majority of the intermediate files. Some might require manual removal if it requires root access for whatever reason.
+
+```
+# Check out the run names of nextflow run:
+nextflow log -q
+
+# Select one of the names to clean out that particular run
+
+# dry run, displays all the folders that it is GOING to remove
+nextflow clean -n nextflow_run_name 
+
+# will remove stuff associated to nextflow_run_name
+nextflow clean -f nextflow_run_name 
+
+# or you can clean out everything
+nextflow clean -f $(nextflow log -q)
+
+
+```
 
 ## Contributors to WookScan
 

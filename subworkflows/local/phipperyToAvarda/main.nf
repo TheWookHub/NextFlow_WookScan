@@ -61,14 +61,33 @@ process PHIPOUTPUT_EXTRACT{
         """
 }
 
+process PHIPOUTPUT_EXTRACT_HUSCAN{
+    publishDir "$params.results/pickle_data/", mode: 'copy', overwrite: true
+    input:        
+        val phipdata_name
+    output:
+        path "*.csv"
+    script:
+        """
+        simple_phippery_process.py \
+        -d $phipdata_name \
+        -c "ref_accession"
+        
+        """
+}
+
 workflow PHIPPERYTOAVARDA{
     take:
         data_phip_ch
-
+        upep_prefix_ch
     main:        
-        upep_prefix_ch = Channel.value(params.user_pep_id)        
+        // upep_prefix_ch = Channel.value(params.user_pep_id)        
         PHIPOUTPUT(upep_prefix_ch,data_phip_ch)
-        PHIPOUTPUT_EXTRACT(data_phip_ch)
+        if(params.runtype == 'huscan'){
+            PHIPOUTPUT_EXTRACT_HUSCAN(data_phip_ch)
+        }else if(params.runtype == 'virscan'){
+            PHIPOUTPUT_EXTRACT(data_phip_ch)
+        }
     emit:
         virlib = PHIPOUTPUT.out.virlib
         edgeRhits = PHIPOUTPUT.out.edgeRhits    

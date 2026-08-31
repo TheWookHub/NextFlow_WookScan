@@ -20,12 +20,13 @@ process run_edgeR {
     tuple path(phip_data), path(phip_data_csvs)
     output:
     tuple path(phip_data), path("edgeR*.csv"), path("PhIPData.rds"), val("edgeR")
-    shell:    
-    """
-    run_edgeR.Rscript ${params.edgeR_threshold}
+    shell:
+    """    
+    run_edgeR.Rscript ${params.edgeR_threshold}    
     """
 }
 
+// run_edgeR.Rscript ${params.edgeR_threshold}
 //mv PhIPData.rds ${params.dataset_prefix}.rds
 
 process run_BEER {

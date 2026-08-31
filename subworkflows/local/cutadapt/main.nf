@@ -14,10 +14,13 @@ process CUTADAPT_OUT{
     input:
         tuple val(tech_id),val(basename_r1),path(filename_r1),val(basename_r2),path(filename_r2)
     output:
-        path("*_trimmed.fastq.gz"), emit: trimmedFqName        
-
-    // need to change this cutadapt file input line because now there are two files instead of one
-    // need to figure out how the input sample table file should look like
+        //path("*_trimmed.fastq.gz"), emit: trimmedFqName        
+        tuple val(tech_id),
+              val(basename_r1),
+              val(basename_r2),
+              path("${basename_r1}_trimmed.fastq.gz"),
+              path("${basename_r2}_trimmed.fastq.gz"),
+              emit: trimmedTuple    
     script:
         """
         cutadapt \
@@ -26,6 +29,7 @@ process CUTADAPT_OUT{
         -G "file:${params.r2_adapters}" \
         -o "${basename_r1}_trimmed.fastq.gz" \
         -p "${basename_r2}_trimmed.fastq.gz" \
+        --match-read-wildcards \
         ${filename_r1} ${filename_r2}
         """
 }
@@ -38,12 +42,11 @@ process UNRAVEL_TRIMMED_NAMES{
     output:
         path "trimmed_names_collection.tsv", emit: trimmed_names_collection
     script:
-        """
-        echo ${trimmed_fastq_list} | \
-        grep -o '/[^ ]*fastq.gz' | \
-        awk '/_R1_/ {r1=\$0} /_R2_/ {print r1 "\t" \$0}' > trimmed_names_collection.tsv
-
-        """
+    def rows = trimmed_fastq_list
+    def text = rows.collect { row ->"${row[3]}\t${row[4]}"}.join('\n')
+    """    
+    printf '%s\n' '${text}' > trimmed_names_collection.tsv
+    """
 }
 
 // process UPDATE_SAMPLE_TABLE is to update the sample table with the filtered fastq file names
@@ -84,16 +87,22 @@ workflow CUTADAPT_WORKFLOW{
                         file(row.fastq_filepath2) // fastq file path for r2
                     )                    
                 }
-            .set { sample_table_ch }        
-        
+            .set { sample_table_ch }
         // Run cutadapt to remove 5' adapters in paired end fastq files.
         // then record the trimmed files and prep it to be pass to fastp.
         // NOTE: NEED TO CHANGE SO FASTP CAN TAKE IN PAIRED END FILES AT THIS STAGE
-        CUTADAPT_OUT(sample_table_ch)        
-        UNRAVEL_TRIMMED_NAMES(CUTADAPT_OUT.out.trimmedFqName.toList())        
+        CUTADAPT_OUT(sample_table_ch)
+        CUTADAPT_OUT.out.trimmedTuple.set{trimmedTuple_ch}
+        CUTADAPT_OUT.out.trimmedTuple
+            .toList()
+            .map {rows -> rows.sort {it[0]}}            
+            .set {trimmed_fastq_list_ch}
+        UNRAVEL_TRIMMED_NAMES(trimmed_fastq_list_ch)        
         UNRAVEL_TRIMMED_NAMES.out.trimmed_names_collection.set{collection_tsv_ch}
-        UPDATE_SAMPLE_TABLE(collection_tsv_ch,sample_ch)        
+        UPDATE_SAMPLE_TABLE(collection_tsv_ch,sample_ch)
+        UPDATE_SAMPLE_TABLE.out.trimmed_table.set{trimmed_sample_table_ch}
     emit:       
-        sample_info = UPDATE_SAMPLE_TABLE.out.trimmed_table
+        trimmed_tuple = trimmed_fastq_list_ch
+        sample_info = trimmed_sample_table_ch
 }
 

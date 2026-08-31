@@ -31,7 +31,7 @@ if(stage in ["trimmed","filtered"]):
     ).rename(
         columns = {0:'R1_Path', 1:'R2_Path'}
     )
-
+    print(trimmed_or_filtered)
     # extract the file base names from filtered and original sample tables
     # and calling them as "Base". We're also changing the file paths to point to filtered
     # fastq files in the results directory.
